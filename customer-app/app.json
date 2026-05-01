@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "Juicy App",
+    "slug": "juice-shop-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "sdkVersion": "52.0.0",
+    "newArchEnabled": false,
+    "scheme": "juice-shop",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.preetham.juiceshop"
+    },
+    "android": {
+      "package": "com.preetham.juiceshop",
+      "permissions": [
+        "INTERNET"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "juice-shop"
+          },
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "edgeToEdgeEnabled": true
+    },
+    "androidStatusBar": {
+      "translucent": false,
+      "backgroundColor": "#ffffff"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "multiDexEnabled": true,
+            "minSdkVersion": 24,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 34,
+            "kotlinVersion": "1.9.25",
+            "gradleProperties": {
+              "kotlin.suppressKotlinVersionCompatibilityCheck": "true",
+              "compose.kotlin.suppressKotlinVersionCompatibilityCheck": "true"
+            }
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "500cb950-5778-4fa5-9d22-161f2209da2f"
+      }
+    },
+    "owner": "emm2"
+  }
+}

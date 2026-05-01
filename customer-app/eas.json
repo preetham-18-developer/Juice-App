@@ -1,0 +1,32 @@
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://juozeonesyttmaizdso.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1b3plb25lc3l0dHRtYWl6ZHNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk4MjgsImV4cCI6MjA5MzE3NTgyOH0.dfWHMFp62ET2rGdKVlcLQgQ8ZV9PyMzivEexkZVY6n8",
+        "EXPO_PUBLIC_API_URL": "https://razor-pay-backend-u1jy.onrender.com/api/payment",
+        "EXPO_PUBLIC_RAZORPAY_KEY": "rzp_test_Shgn1PuPVEOaBC"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://juozeonesyttmaizdso.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1b3plb25lc3l0dHRtYWl6ZHNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk4MjgsImV4cCI6MjA5MzE3NTgyOH0.dfWHMFp62ET2rGdKVlcLQgQ8ZV9PyMzivEexkZVY6n8",
+        "EXPO_PUBLIC_API_URL": "https://razor-pay-backend-u1jy.onrender.com/api/payment",
+        "EXPO_PUBLIC_RAZORPAY_KEY": "rzp_test_Shgn1PuPVEOaBC"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
