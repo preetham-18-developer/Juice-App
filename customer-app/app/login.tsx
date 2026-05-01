@@ -45,47 +45,56 @@ export default function LoginScreen() {
     }
     
     setLoading(true);
-    let attempts = 0;
-    const maxRetries = 3;
+    
+    // VERIFICATION ALERT: This proves what the APK actually sees
+    Alert.alert(
+      "Build Environment Check",
+      `URL: ${process.env.EXPO_PUBLIC_SUPABASE_URL}\nKey Length: ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.length || 0}`,
+      [{ text: "Proceed to Login", onPress: () => startAuth() }]
+    );
 
-    const attemptSignIn = async (): Promise<any> => {
-      attempts++;
-      console.log(`[Login] Attempt ${attempts}/${maxRetries} for:`, email.trim());
+    async function startAuth() {
+      let attempts = 0;
+      const maxRetries = 3;
 
-      try {
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Network connection timed out.')), 15000)
-        );
+      const attemptSignIn = async (): Promise<any> => {
+        attempts++;
+        console.log(`[Login] Attempt ${attempts}/${maxRetries} for:`, email.trim());
 
-        const result = (await Promise.race([
-          supabase.auth.signInWithPassword({ email: email.trim(), password }),
-          timeoutPromise
-        ])) as { data: any; error: any };
+        try {
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Network connection timed out.')), 15000)
+          );
 
-        if (result.error) {
-          // If it's a 400 or 500 error, don't retry, just show it
-          console.log("AUTH ERROR FULL:", JSON.stringify(result.error, null, 2));
-          Alert.alert('Server Error', `Message: ${result.error.message}\nStatus: ${result.error.status}\nCode: ${result.error.code}`);
-          return;
+          const result = (await Promise.race([
+            supabase.auth.signInWithPassword({ email: email.trim(), password }),
+            timeoutPromise
+          ])) as { data: any; error: any };
+
+          if (result.error) {
+            console.log("AUTH ERROR FULL:", JSON.stringify(result.error, null, 2));
+            Alert.alert('Server Error', `Message: ${result.error.message}\nStatus: ${result.error.status}\nCode: ${result.error.code}`);
+            return;
+          }
+
+          console.log("LOGIN SUCCESS:", result.data.user?.email);
+          Alert.alert('Success', 'Login successful!');
+        } catch (err: any) {
+          console.log(`[Login] Attempt ${attempts} Failed:`, err.message);
+          
+          if (attempts < maxRetries && (err.message.includes('Network') || err.message.includes('timed out'))) {
+            console.log('[Login] Retrying in 2 seconds...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return attemptSignIn();
+          } else {
+            Alert.alert('Network Failure', `Exhausted ${maxRetries} attempts.\nError: ${err.message}`);
+          }
         }
+      };
 
-        console.log("LOGIN SUCCESS:", result.data.user?.email);
-        Alert.alert('Success', 'Login successful!');
-      } catch (err: any) {
-        console.log(`[Login] Attempt ${attempts} Failed:`, err.message);
-        
-        if (attempts < maxRetries && (err.message.includes('Network') || err.message.includes('timed out'))) {
-          console.log('[Login] Retrying in 2 seconds...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          return attemptSignIn();
-        } else {
-          Alert.alert('Network Failure', `Exhausted ${maxRetries} attempts.\nError: ${err.message}`);
-        }
-      }
-    };
-
-    await attemptSignIn();
-    setLoading(false);
+      await attemptSignIn();
+      setLoading(false);
+    }
   };
 
   return (
