@@ -3,19 +3,17 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Primary: read from EAS build env vars
-// Fallback: hardcoded production values (safe — anon key is public-facing)
-const supabaseUrl =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  'https://tzpmsylelpqzjmfvabga.supabase.co';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabaseAnonKey =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6cG1zeWxlbHBxemptZnZhYmdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzQwMTcsImV4cCI6MjA5MjYxMDAxN30.a8pHx5OubH0ODbWHImt0Ejp2Hj3kAtlI5i14YnkKUXk';
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('[Supabase] CRITICAL: Environment variables are missing! Check your EAS build config.');
+}
 
-console.log('[Supabase] Initializing with URL:', supabaseUrl);
-console.log('[Supabase] Key Prefix:', supabaseAnonKey.substring(0, 10) + '...');
+console.log('[Supabase] Target URL:', supabaseUrl);
+console.log('[Supabase] Key Length:', supabaseAnonKey?.length || 0);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,

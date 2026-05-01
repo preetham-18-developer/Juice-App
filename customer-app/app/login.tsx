@@ -28,6 +28,17 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    // Diagnostic Network Tests
+    fetch("https://www.google.com")
+      .then(() => console.log("[Diagnostics] GOOGLE_OK"))
+      .catch(e => console.log("[Diagnostics] GOOGLE_FAIL", e.message));
+
+    fetch("https://juozeonesytttmaizdso.supabase.co")
+      .then(() => console.log("[Diagnostics] SUPABASE_OK"))
+      .catch(e => console.log("[Diagnostics] SUPABASE_FAIL", e.message));
+  }, []);
+
   const handleLogin = async () => {
     if (!email || !password) {
       return Alert.alert('Error', 'Please enter both email and password');
@@ -41,23 +52,24 @@ export default function LoginScreen() {
       );
 
       const result = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
+        supabase.auth.signInWithPassword({ email: email.trim(), password }),
         timeoutPromise
       ]) as { data: any; error: any };
 
       if (result.error) {
-        console.error('[Login] Supabase Error:', result.error);
+        console.error('[Login] Supabase Rejected:', result.error);
+        // This will show exactly what the server says (e.g. "Invalid credentials" or "Email not confirmed")
+        Alert.alert('Server Response', `${result.error.message}\n\nStatus: ${result.error.status}\nCode: ${result.error.code || 'N/A'}`);
         throw result.error;
       }
       
-      console.log('[Login] Success');
+      console.log('[Login] Success. Session for:', result.data.user?.email);
+      Alert.alert('Success', 'Login successful! Redirecting...');
     } catch (error: any) {
-      console.error('[Login] Catch Error:', error);
-      let errorMsg = error.message;
-      if (errorMsg === 'Network request failed') {
-        errorMsg = 'Network request failed. This usually means the server is unreachable or your internet is down. (URL: ' + process.env.EXPO_PUBLIC_SUPABASE_URL + ')';
+      console.error('[Login] Catch Block:', error);
+      if (error.message === 'Network request failed') {
+        Alert.alert('Network Error', 'Still cannot reach server. Check: ' + process.env.EXPO_PUBLIC_SUPABASE_URL);
       }
-      Alert.alert('Login Error', errorMsg);
     } finally {
       setLoading(false);
     }

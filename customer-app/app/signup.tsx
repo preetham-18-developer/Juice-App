@@ -50,7 +50,8 @@ export default function SignupScreen() {
       });
 
       if (error) {
-        console.error('[Signup] Supabase Error:', error);
+        console.error('[Signup] Supabase Rejected:', error);
+        Alert.alert('Server Response', `${error.message}\n\nStatus: ${error.status}\nCode: ${error.code || 'N/A'}`);
         throw error;
       }
 
@@ -60,18 +61,12 @@ export default function SignupScreen() {
       if (data?.user && !data.session) {
         // Email confirmation required — show success state
         setSignupDone(true);
-      } else if (data?.session) {
-        // Auto-confirmed (no email verification) — _layout handles redirect
       }
     } catch (error: any) {
-      console.error('[Signup] Catch Error:', error);
-      let msg = error.message;
-      if (msg?.includes('already registered') || msg?.includes('already been registered')) {
-        msg = 'This email is already registered. Please sign in instead.';
-      } else if (msg?.includes('network') || msg?.includes('fetch')) {
-        msg = 'Network request failed. Please check your internet and try again. (URL: ' + process.env.EXPO_PUBLIC_SUPABASE_URL + ')';
+      console.error('[Signup] Catch Block:', error);
+      if (error.message === 'Network request failed') {
+        Alert.alert('Network Error', 'Cannot reach Supabase. Check: ' + process.env.EXPO_PUBLIC_SUPABASE_URL);
       }
-      Alert.alert('Signup Failed', msg);
     } finally {
       setLoading(false);
     }

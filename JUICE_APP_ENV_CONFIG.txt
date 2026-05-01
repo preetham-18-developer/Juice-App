@@ -1,0 +1,27 @@
+JUICY APP: PRODUCTION ENVIRONMENT CONFIGURATION
+==============================================
+
+CUSTOMER APP (Expo / EAS Build)
+----------------------------------------------
+EXPO_PUBLIC_SUPABASE_URL: https://juozeonesytttmaizdso.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1b3plb25lc3l0dHRtYWl6ZHNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk4MjgsImV4cCI6MjA5MzE3NTgyOH0.dfWHMFp62ET2rGdKVlcLQgQ8ZV9PyMzivEexkZVY6n8
+EXPO_PUBLIC_API_URL: https://juice-app-9uzq.onrender.com/api/payment
+EXPO_PUBLIC_RAZORPAY_KEY: rzp_test_Shgn1PuPVEOaBC
+
+RAZORPAY BACKEND (Render Dashboard)
+----------------------------------------------
+PORT: 5000
+NODE_ENV: production
+RAZORPAY_KEY_ID: rzp_test_Shgn1PuPVEOaBC
+RAZORPAY_KEY_SECRET: pxTjWKj2xkoj97kY8LkH5rlk
+SUPABASE_URL: https://juozeonesytttmaizdso.supabase.co
+SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1b3plb25lc3l0dHRtYWl6ZHNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk4MjgsImV4cCI6MjA5MzE3NTgyOH0.dfWHMFp62ET2rGdKVlcLQgQ8ZV9PyMzivEexkZVY6n8
+
+----------------------------------------------
+DEPLOYMENT STEPS FOR RENDER:
+1. New Web Service -> Select Juice-App Repo.
+2. Root Directory: razorpay-backend
+3. Build Command: npm install
+4. Start Command: npm start
+5. Add the Environment Variables listed above.
+----------------------------------------------
