@@ -39,37 +39,55 @@ export default function SignupScreen() {
     }
 
     setLoading(true);
-    try {
-      console.log('[Signup] Attempting signup for:', email);
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: { full_name: name.trim(), phone: phone.trim() }
+    let attempts = 0;
+    const maxRetries = 3;
+
+    const attemptSignUp = async (): Promise<any> => {
+      attempts++;
+      console.log(`[Signup] Attempt ${attempts}/${maxRetries} for:`, email.trim());
+
+      try {
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Network connection timed out.')), 15000)
+        );
+
+        const { data, error } = (await Promise.race([
+          supabase.auth.signUp({
+            email: email.trim().toLowerCase(),
+            password,
+            options: {
+              data: { full_name: name.trim(), phone: phone.trim() }
+            }
+          }),
+          timeoutPromise
+        ])) as { data: any; error: any };
+
+        if (error) {
+          console.log("AUTH ERROR FULL:", JSON.stringify(error, null, 2));
+          Alert.alert('Signup Rejected', `Message: ${error.message}\nStatus: ${error.status}\nCode: ${error.code}`);
+          return;
         }
-      });
 
-      if (error) {
-        console.error('[Signup] Supabase Rejected:', error);
-        Alert.alert('Server Response', `${error.message}\n\nStatus: ${error.status}\nCode: ${error.code || 'N/A'}`);
-        throw error;
-      }
+        console.log("SIGNUP SUCCESS:", data?.user?.id);
 
-      console.log('[Signup] Success. User ID:', data?.user?.id);
+        if (data?.user && !data.session) {
+          setSignupDone(true);
+        }
+      } catch (err: any) {
+        console.log(`[Signup] Attempt ${attempts} Failed:`, err.message);
+        
+        if (attempts < maxRetries && (err.message.includes('Network') || err.message.includes('timed out'))) {
+          console.log('[Signup] Retrying in 2 seconds...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return attemptSignUp();
+        } else {
+          Alert.alert('Network Failure', `Exhausted ${maxRetries} attempts.\nError: ${err.message}`);
+        }
+      }
+    };
 
-      // Check if email confirmation is needed
-      if (data?.user && !data.session) {
-        // Email confirmation required — show success state
-        setSignupDone(true);
-      }
-    } catch (error: any) {
-      console.error('[Signup] Catch Block:', error);
-      if (error.message === 'Network request failed') {
-        Alert.alert('Network Error', 'Cannot reach Supabase. Check: ' + process.env.EXPO_PUBLIC_SUPABASE_URL);
-      }
-    } finally {
-      setLoading(false);
-    }
+    await attemptSignUp();
+    setLoading(false);
   };
 
   // ── Post-signup confirmation screen ──────────────────────────────────────
