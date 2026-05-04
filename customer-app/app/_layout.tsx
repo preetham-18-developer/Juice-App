@@ -84,7 +84,10 @@ export default function RootLayout() {
             .from('profiles')
             .select('role')
             .eq('id', session.user.id)
-            .single();
+            .maybeSingle();
+
+          // Double check: if profile is missing, check if it's the known admin email
+          const userRole = data?.role || (session.user.email === 'preethamgoud2006@gmail.com' ? 'admin' : 'user');
 
           if (error) {
             console.log("[Auth] Profile fetch error (likely missing):", error.message);
