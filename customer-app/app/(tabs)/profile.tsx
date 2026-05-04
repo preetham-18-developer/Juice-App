@@ -94,21 +94,39 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Log Out', 
-          style: 'destructive', 
-          onPress: async () => {
-            await supabase.auth.signOut();
-            router.replace('/login');
-          } 
-        },
-      ]
-    );
+    const performLogout = async () => {
+      try {
+        setLoading(true);
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        
+        // Clear any local storage that might be stuck
+        if (typeof localStorage !== 'undefined') {
+          localStorage.clear();
+        }
+        
+        router.replace('/login');
+      } catch (error: any) {
+        Alert.alert('Error', error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (confirm('Are you sure you want to log out?')) {
+        await performLogout();
+      }
+    } else {
+      Alert.alert(
+        'Log Out',
+        'Are you sure you want to log out?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Log Out', style: 'destructive', onPress: performLogout },
+        ]
+      );
+    }
   };
 
   const renderSettingRow = (label: string, value: boolean, onValueChange: (v: boolean) => void) => (
