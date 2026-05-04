@@ -72,7 +72,7 @@ export default function ProductManagement() {
     fetchProducts();
   }, []);
 
-  const openModal = (product: any = null) => {
+  const openModal = async (product: any = null) => {
     if (product) {
       setEditingProduct(product);
       setName(product.name);
