@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { COLORS, TYPOGRAPHY, RADIUS, SPACING } from '../theme/tokens';
 import { AlertCircle, RefreshCcw } from 'lucide-react-native';
 
@@ -9,15 +9,17 @@ interface Props {
 
 interface State {
   hasError: boolean;
+  error: Error | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
-    hasError: false
+    hasError: false,
+    error: null
   };
 
-  public static getDerivedStateFromError(_: Error): State {
-    return { hasError: true };
+  public static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -35,8 +37,11 @@ export class ErrorBoundary extends Component<Props, State> {
           <AlertCircle size={64} color={COLORS.error} />
           <Text style={styles.title}>Something went wrong</Text>
           <Text style={styles.subtitle}>
-            We encountered an unexpected error. Our team has been notified.
+            We encountered an unexpected error.
           </Text>
+          <View style={styles.errorDetail}>
+            <Text style={styles.errorText}>{this.state.error?.message || 'Unknown Error'}</Text>
+          </View>
           <TouchableOpacity style={styles.button} onPress={this.handleRetry}>
             <RefreshCcw size={20} color={COLORS.white} style={{ marginRight: 8 }} />
             <Text style={styles.buttonText}>Try Again</Text>
@@ -78,5 +83,19 @@ const styles = StyleSheet.create({
   buttonText: {
     color: COLORS.white,
     fontWeight: 'bold',
+  },
+  errorDetail: {
+    backgroundColor: '#FFF1F2',
+    padding: 16,
+    borderRadius: 12,
+    marginVertical: 20,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+  },
+  errorText: {
+    color: '#E11D48',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 12,
   },
 });

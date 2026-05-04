@@ -14,8 +14,10 @@ import {
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../src/theme/tokens';
 import { supabase } from '../../lib/supabase';
-import { Plus, Edit2, Trash2, X, Apple, Citrus, Camera } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, X, Apple, Citrus, Camera, FileText, Upload } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 
 export default function ProductManagement() {
   const [products, setProducts] = useState<any[]>([]);
@@ -28,8 +30,10 @@ export default function ProductManagement() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<'fruit' | 'juice'>('fruit');
   const [price, setPrice] = useState('');
+  const [purePrice, setPurePrice] = useState(''); // New for Juice
   const [stock, setStock] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [isAvailable, setIsAvailable] = useState(true);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -76,13 +80,29 @@ export default function ProductManagement() {
       setPrice(String(product.price_per_kg || 0));
       setStock(String(product.stock_kg || 0));
       setImageUrl(product.image_url || '');
+      setIsAvailable(product.is_available);
+      
+      // Fetch juice variants if it's a juice
+      if (product.category === 'juice') {
+        const { data: variants } = await supabase
+          .from('juice_variants')
+          .select('*')
+          .eq('product_id', product.id);
+        
+        const normal = variants?.find(v => v.variant_type === 'normal');
+        const pure = variants?.find(v => v.variant_type === 'very_pure');
+        if (normal) setPrice(String(normal.price));
+        if (pure) setPurePrice(String(pure.price));
+      }
     } else {
       setEditingProduct(null);
       setName('');
       setCategory('fruit');
       setPrice('');
+      setPurePrice('');
       setStock('');
       setImageUrl('');
+      setIsAvailable(true);
     }
     setModalVisible(true);
   };
@@ -94,10 +114,6 @@ export default function ProductManagement() {
     }
 
     try {
-      // If the imageUrl is a local file (starts with file:// or ph://),
-      // in a real production app we would upload it to Supabase Storage.
-      // For this demo/setup, we'll use a curated Unsplash image if no URL is provided,
-      // or keep the URL if it's already a public one.
       const finalImageUrl = imageUrl.startsWith('http') 
         ? imageUrl 
         : 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&q=80&w=400';
@@ -108,7 +124,7 @@ export default function ProductManagement() {
         price_per_kg: category === 'fruit' ? parseFloat(price) : null,
         stock_kg: parseFloat(stock) || 0,
         image_url: finalImageUrl,
-        is_available: true
+        is_available: isAvailable
       };
 
       if (editingProduct) {
@@ -117,17 +133,102 @@ export default function ProductManagement() {
           .update(productData)
           .eq('id', editingProduct.id);
         if (error) throw error;
+
+        if (category === 'juice') {
+          // Update/Upsert variants
+          await supabase.from('juice_variants').upsert([
+            { product_id: editingProduct.id, variant_type: 'normal', price: parseFloat(price), size: '300ml' },
+            { product_id: editingProduct.id, variant_type: 'very_pure', price: parseFloat(purePrice), size: '300ml' }
+          ], { onConflict: 'product_id,variant_type' });
+        }
       } else {
-        const { error } = await supabase
+        const { data: newProduct, error } = await supabase
           .from('products')
-          .insert([productData]);
+          .insert([productData])
+          .select()
+          .single();
         if (error) throw error;
+
+        if (category === 'juice' && newProduct) {
+          const { error: variantError } = await supabase
+            .from('juice_variants')
+            .insert([
+              { product_id: newProduct.id, variant_type: 'normal', price: parseFloat(price), size: '300ml' },
+              { product_id: newProduct.id, variant_type: 'very_pure', price: parseFloat(purePrice), size: '300ml' }
+            ]);
+          if (variantError) throw variantError;
+        }
       }
 
       setModalVisible(false);
       fetchProducts();
     } catch (err: any) {
       Alert.alert("Error", err.message);
+    }
+  };
+
+  const handleBulkImport = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'text/comma-separated-values',
+        copyToCacheDirectory: true
+      });
+
+      if (result.canceled) return;
+
+      setLoading(true);
+      const fileUri = result.assets[0].uri;
+      const content = await FileSystem.readAsStringAsync(fileUri);
+      
+      // Basic CSV Parser
+      const lines = content.split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('item'));
+      const priceIdx = headers.findIndex(h => h.includes('price') || h.includes('cost'));
+      const stockIdx = headers.findIndex(h => h.includes('stock') || h.includes('qty') || h.includes('quantity'));
+      const typeIdx = headers.findIndex(h => h.includes('type') || h.includes('category'));
+
+      if (nameIdx === -1 || priceIdx === -1) {
+        Alert.alert("Error", "CSV must have 'Name' and 'Price' columns.");
+        setLoading(false);
+        return;
+      }
+
+      const updates = [];
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',').map(r => r.trim());
+        if (row.length < 2 || !row[nameIdx]) continue;
+
+        const pName = row[nameIdx];
+        const pPrice = parseFloat(row[priceIdx]);
+        const pStock = stockIdx !== -1 ? parseFloat(row[stockIdx]) : 50;
+        const pType = typeIdx !== -1 ? row[typeIdx].toLowerCase() : 'fruit';
+
+        updates.push({
+          name: pName,
+          category: pType.includes('juice') ? 'juice' : 'fruit',
+          price_per_kg: pType.includes('juice') ? null : pPrice,
+          stock_kg: pStock,
+          is_available: pStock > 0,
+          image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&q=80&w=400'
+        });
+      }
+
+      if (updates.length > 0) {
+        const { error } = await supabase
+          .from('products')
+          .upsert(updates, { onConflict: 'name' });
+        
+        if (error) throw error;
+        
+        Alert.alert("Success", `Imported ${updates.length} items successfully.`);
+        fetchProducts();
+      }
+    } catch (err: any) {
+      Alert.alert("Import Error", err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -231,11 +332,17 @@ export default function ProductManagement() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Catalog Management</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
-          <Plus size={20} color={COLORS.white} />
-          <Text style={styles.addBtnText}>Add Product</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Catalog</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={[styles.addBtn, { backgroundColor: COLORS.mutedGray }]} onPress={handleBulkImport}>
+            <Upload size={18} color={COLORS.white} />
+            <Text style={styles.addBtnText}>CSV</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
+            <Plus size={18} color={COLORS.white} />
+            <Text style={styles.addBtnText}>Add</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -306,7 +413,7 @@ export default function ProductManagement() {
 
               <View style={styles.inputRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Price (₹)</Text>
+                  <Text style={styles.label}>{category === 'fruit' ? 'Price (₹/kg)' : 'Normal Price'}</Text>
                   <TextInput 
                     style={styles.input} 
                     value={price} 
@@ -315,16 +422,39 @@ export default function ProductManagement() {
                     placeholder="0.00"
                   />
                 </View>
-                <View style={{ flex: 1, marginLeft: 16 }}>
-                  <Text style={styles.label}>Stock (kg)</Text>
-                  <TextInput 
-                    style={styles.input} 
-                    value={stock} 
-                    onChangeText={setStock} 
-                    keyboardType="numeric" 
-                    placeholder="0.0"
-                  />
-                </View>
+                {category === 'juice' ? (
+                  <View style={{ flex: 1, marginLeft: 16 }}>
+                    <Text style={styles.label}>Pure Price</Text>
+                    <TextInput 
+                      style={styles.input} 
+                      value={purePrice} 
+                      onChangeText={setPurePrice} 
+                      keyboardType="numeric" 
+                      placeholder="0.00"
+                    />
+                  </View>
+                ) : (
+                  <View style={{ flex: 1, marginLeft: 16 }}>
+                    <Text style={styles.label}>Stock (kg)</Text>
+                    <TextInput 
+                      style={styles.input} 
+                      value={stock} 
+                      onChangeText={setStock} 
+                      keyboardType="numeric" 
+                      placeholder="0.0"
+                    />
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.availabilityRow}>
+                <Text style={styles.label}>Mark as Available</Text>
+                <TouchableOpacity 
+                  onPress={() => setIsAvailable(!isAvailable)}
+                  style={[styles.toggleBase, isAvailable ? styles.toggleOn : styles.toggleOff]}
+                >
+                  <View style={[styles.toggleCircle, isAvailable ? styles.circleOn : styles.circleOff]} />
+                </TouchableOpacity>
               </View>
               
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
@@ -593,5 +723,31 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '800',
-  }
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.lightGray,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+  toggleBase: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    padding: 4,
+    justifyContent: 'center',
+  },
+  toggleOn: { backgroundColor: COLORS.primaryGreen },
+  toggleOff: { backgroundColor: '#cbd5e1' },
+  toggleCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.white,
+  },
+  circleOn: { alignSelf: 'flex-end' },
+  circleOff: { alignSelf: 'flex-start' },
 });

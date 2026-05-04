@@ -21,7 +21,7 @@ export const Header = () => {
     >
       <TouchableOpacity 
         style={styles.logoWrapper}
-        onPress={() => router.replace('/')}
+        onPress={() => router.replace('/(tabs)')}
       >
         <JuicyLogo size={42} withText={false} />
       </TouchableOpacity>
@@ -29,11 +29,11 @@ export const Header = () => {
       <Text style={styles.logoText}>JuicyApp</Text>
 
       <View style={styles.rightIcons}>
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/notifications')}>
           <Bell size={24} color={COLORS.darkText} />
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/cart')}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/(tabs)/cart')}>
           <ShoppingCart size={24} color={COLORS.darkText} />
           {cartCount > 0 && (
             <View style={styles.badge}>

@@ -1,69 +1,45 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import * as React from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image } from 'react-native';
 import Animated, { 
   useAnimatedStyle, 
   useSharedValue, 
-  withSpring, 
   interpolate,
   useAnimatedScrollHandler,
-  Extrapolate
+  Extrapolation
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, RADIUS } from '../../theme/tokens';
-import { useRouter } from 'expo-router';
+import { Product } from '../../types';
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = 300;
-const CARD_HEIGHT = 400;
+const CARD_HEIGHT = 420;
 
-interface CardData {
-  emoji: string;
-  hueA: number;
-  hueB: number;
-  id?: string;
-  name: string;
-}
-
-const food: CardData[] = [
-  { emoji: "🍅", hueA: 340, hueB: 10, name: "Tomato" },
-  { emoji: "🍊", hueA: 20, hueB: 40, name: "Orange" },
-  { emoji: "🍋", hueA: 60, hueB: 90, name: "Lemon" },
-  { emoji: "🍐", hueA: 80, hueB: 120, name: "Pear" },
-  { emoji: "🍏", hueA: 100, hueB: 140, name: "Apple" },
-  { emoji: "🫐", hueA: 205, hueB: 245, name: "Blueberry" },
-  { emoji: "🍆", hueA: 260, hueB: 290, name: "Eggplant" },
-  { emoji: "🍇", hueA: 290, hueB: 320, name: "Grape" },
-];
-
-const hue = (h: number) => `hsl(${h}, 100%, 50%)`;
-
-const Card = ({ item, index, scrollY, onPress }: { item: CardData, index: number, scrollY: Animated.SharedValue<number>, onPress: () => void }) => {
-  const cardY = index * (CARD_HEIGHT - 100);
+const Card = ({ item, index, scrollY, onPress }: { item: Product, index: number, scrollY: Animated.SharedValue<number>, onPress: () => void }) => {
+  const cardY = index * (CARD_HEIGHT - 60);
   
   const animatedStyle = useAnimatedStyle(() => {
-    // Distance from the top of the viewport
     const distance = cardY - scrollY.value;
     
-    // Scale and rotate effect as it enters/leaves
     const scale = interpolate(
       distance,
       [WINDOW_HEIGHT, WINDOW_HEIGHT * 0.5, 0],
-      [0.8, 1, 1],
-      Extrapolate.CLAMP
+      [0.85, 1, 1],
+      Extrapolation.CLAMP
     );
 
     const rotate = interpolate(
       distance,
       [WINDOW_HEIGHT, WINDOW_HEIGHT * 0.5, 0],
-      [0, -10, 0],
-      Extrapolate.CLAMP
+      [0, -8, 0],
+      Extrapolation.CLAMP
     );
 
     const translateY = interpolate(
       distance,
       [WINDOW_HEIGHT, WINDOW_HEIGHT * 0.5, 0],
-      [300, 50, 0],
-      Extrapolate.CLAMP
+      [200, 40, 0],
+      Extrapolation.CLAMP
     );
 
     return {
@@ -74,19 +50,22 @@ const Card = ({ item, index, scrollY, onPress }: { item: CardData, index: number
       ],
       opacity: interpolate(
         distance,
-        [WINDOW_HEIGHT, WINDOW_HEIGHT * 0.7, WINDOW_HEIGHT * 0.3],
+        [WINDOW_HEIGHT, WINDOW_HEIGHT * 0.8, WINDOW_HEIGHT * 0.2],
         [0, 1, 1],
-        Extrapolate.CLAMP
+        Extrapolation.CLAMP
       )
     };
   });
 
-  const background: [string, string] = [hue(item.hueA), hue(item.hueB)];
+  // Dynamic hue based on index for a colorful feel
+  const h1 = (index * 40) % 360;
+  const h2 = (h1 + 40) % 360;
+  const hue = (h: number) => `hsl(${h}, 70%, 60%)`;
 
   return (
     <Animated.View style={[styles.cardContainer, animatedStyle]}>
       <LinearGradient
-        colors={background}
+        colors={[hue(h1), hue(h2)]}
         style={styles.splash}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -96,16 +75,22 @@ const Card = ({ item, index, scrollY, onPress }: { item: CardData, index: number
         onPress={onPress}
         style={styles.card}
       >
-        <Text style={styles.emoji}>{item.emoji}</Text>
-        <View style={styles.buyBadge}>
-           <Text style={styles.buyText}>Tap to Buy {item.name}</Text>
+        <Image 
+          source={{ uri: item.image_url || 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&q=80&w=400' }} 
+          style={styles.image}
+        />
+        <View style={styles.textContent}>
+           <Text style={styles.productName}>{item.name}</Text>
+           <View style={styles.buyBadge}>
+              <Text style={styles.buyText}>₹{item.price || item.price_per_kg || 80} • Explore</Text>
+           </View>
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
 };
 
-export const ScrollTriggered = ({ onSelectProduct }: { onSelectProduct: (name: string) => void }) => {
+export const ScrollTriggered = ({ products, onSelectProduct }: { products: Product[], onSelectProduct: (id: string) => void }) => {
   const scrollY = useSharedValue(0);
 
   const scrollHandler = useAnimatedScrollHandler((event) => {
@@ -120,20 +105,26 @@ export const ScrollTriggered = ({ onSelectProduct }: { onSelectProduct: (name: s
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerSpacer}>
-        <Text style={styles.title}>Seasonal Fruits</Text>
-        <Text style={styles.subtitle}>Scroll down to explore fresh picks</Text>
+        <Text style={styles.title}>Seasonal Harvest</Text>
+        <Text style={styles.subtitle}>Hand-picked freshness just for you</Text>
       </View>
       
-      {food.map((item, i) => (
-        <Card 
-          key={item.emoji} 
-          item={item} 
-          index={i} 
-          scrollY={scrollY}
-          onPress={() => onSelectProduct(item.name)}
-        />
-      ))}
-      <View style={{ height: 200 }} />
+      {products.length > 0 ? (
+        products.map((item, i) => (
+          <Card 
+            key={item.id} 
+            item={item} 
+            index={i} 
+            scrollY={scrollY}
+            onPress={() => onSelectProduct(item.id)}
+          />
+        ))
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>New harvest coming soon...</Text>
+        </View>
+      )}
+      <View style={{ height: 240 }} />
     </Animated.ScrollView>
   );
 };
@@ -144,19 +135,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerSpacer: {
-    paddingTop: 40,
-    paddingBottom: 20,
+    paddingTop: 30,
+    paddingBottom: 10,
     alignItems: 'center',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 32,
+    fontWeight: '900',
     color: COLORS.darkText,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: COLORS.mutedGray,
-    marginTop: 4,
+    marginTop: 6,
+    fontFamily: 'Poppins_400Regular',
   },
   cardContainer: {
     width: WINDOW_WIDTH,
@@ -164,48 +157,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    marginBottom: -80,
+    marginBottom: -60,
   },
   splash: {
     position: 'absolute',
-    width: 250,
-    height: 350,
-    borderRadius: 125,
-    opacity: 0.8,
-    bottom: 20,
-    // Custom clipPath isn't directly supported in RN easily without SVG, 
-    // so we use a rounded shape for the mobile "splash" feel.
+    width: 260,
+    height: 380,
+    borderRadius: 130,
+    opacity: 0.4,
+    bottom: 10,
   },
   card: {
     width: CARD_WIDTH,
-    height: CARD_HEIGHT - 50,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: CARD_HEIGHT - 40,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 32,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 15,
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  emoji: {
-    fontSize: 140,
+  image: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  textContent: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 24,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  productName: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   buyBadge: {
-    position: 'absolute',
-    bottom: 30,
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: 12,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: RADIUS.full,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    alignSelf: 'flex-start',
   },
   buyText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: COLORS.primaryGreen,
   },
+  emptyContainer: {
+    marginTop: 100,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: COLORS.mutedGray,
+    fontWeight: '600',
+  }
 });

@@ -22,6 +22,7 @@ interface JuiceCardProps {
   title: string;
   price: number;
   onPress: () => void;
+  onAddToCart?: () => void;
   onLike?: () => void;
   isLiked?: boolean;
 }
@@ -32,6 +33,7 @@ export const DestinationCard = ({
   title,
   price,
   onPress,
+  onAddToCart,
   onLike,
   isLiked = false,
 }: JuiceCardProps) => {
@@ -99,10 +101,23 @@ export const DestinationCard = ({
           <Text style={styles.category}>{category}</Text>
           <Text style={styles.title} numberOfLines={1}>{title}</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.price}>₹{price}</Text>
-            <View style={styles.offerBadge}>
-              <Text style={styles.offerText}>Best Seller</Text>
+            <View>
+              <Text style={styles.price}>₹{price}</Text>
+              <View style={styles.offerBadge}>
+                <Text style={styles.offerText}>Best Seller</Text>
+              </View>
             </View>
+            {onAddToCart && (
+              <TouchableOpacity 
+                style={styles.buyButton} 
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onAddToCart();
+                }}
+              >
+                <Text style={styles.buyButtonText}>Buy</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Animated.View>
@@ -210,6 +225,23 @@ const styles = StyleSheet.create({
   offerText: {
     color: '#10B981',
     fontSize: 9,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  buyButton: {
+    backgroundColor: '#FF7700',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 14,
+    shadowColor: '#FF7700',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buyButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
     fontWeight: '900',
     textTransform: 'uppercase',
   }

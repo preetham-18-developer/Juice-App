@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Home, LayoutGrid, ShoppingCart, User, ShoppingBag } from 'lucide-react-native';
 import { Platform, View, StyleSheet } from 'react-native';
+import * as React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../src/theme/tokens';
 

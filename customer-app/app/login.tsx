@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -18,7 +19,10 @@ import { supabase } from '../lib/supabase';
 import { useRouter } from 'expo-router';
 import { Mail, Lock, ArrowRight, Leaf } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-// import Animated, { FadeInUp, FadeInDown, FadeIn } from 'react-native-reanimated';
+import { COLORS } from '../src/theme/tokens';
+import { Celebration } from '../src/components/ui/Celebration';
+import { Toast, ToastHandle } from '../src/components/ui/Toast';
+import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
@@ -26,79 +30,98 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const router = useRouter();
+  const toastRef = React.useRef<ToastHandle>(null);
 
+  // Redirect after success animation
   useEffect(() => {
-    // Diagnostic Network Tests
-    fetch("https://www.google.com")
-      .then(() => console.log("[Diagnostics] GOOGLE_OK"))
-      .catch(e => console.log("[Diagnostics] GOOGLE_FAIL", e.message));
-
-    fetch("https://juozeonesytttmaizdso.supabase.co")
-      .then(() => console.log("[Diagnostics] SUPABASE_OK"))
-      .catch(e => console.log("[Diagnostics] SUPABASE_FAIL", e.message));
-  }, []);
+    if (loginSuccess) {
+      const checkRoleAndRedirect = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', user.id)
+              .single();
+            
+            if (data?.role === 'admin') {
+              console.log("[Auth] Admin login success. Redirecting to /admin");
+              router.replace('/admin');
+            } else {
+              console.log("[Auth] Customer login success. Redirecting to /(tabs)");
+              router.replace('/(tabs)');
+            }
+          } else {
+            router.replace('/(tabs)');
+          }
+        } catch (err) {
+          console.error("Login redirect error:", err);
+          router.replace('/(tabs)');
+        }
+      };
+      
+      const timer = setTimeout(() => {
+        checkRoleAndRedirect();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [loginSuccess]);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      return Alert.alert('Error', 'Please enter both email and password');
+      return toastRef.current?.show('Please enter your email and password.', 'error');
     }
     
     setLoading(true);
     
-    // VERIFICATION ALERT: This proves what the APK actually sees
-    Alert.alert(
-      "Build Environment Check",
-      `URL: ${process.env.EXPO_PUBLIC_SUPABASE_URL}\nKey Length: ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.length || 0}`,
-      [{ text: "Proceed to Login", onPress: () => startAuth() }]
-    );
+    const maxRetries = 3;
+    const baseDelay = 500; // 0.5s base for backoff
 
-    async function startAuth() {
-      let attempts = 0;
-      const maxRetries = 3;
+    const performSignIn = async (attempt: number): Promise<void> => {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
 
-      const attemptSignIn = async (): Promise<any> => {
-        attempts++;
-        console.log(`[Login] Attempt ${attempts}/${maxRetries} for:`, email.trim());
-
-        try {
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Network connection timed out.')), 15000)
-          );
-
-          const result = (await Promise.race([
-            supabase.auth.signInWithPassword({ email: email.trim(), password }),
-            timeoutPromise
-          ])) as { data: any; error: any };
-
-          if (result.error) {
-            console.log("AUTH ERROR FULL:", JSON.stringify(result.error, null, 2));
-            Alert.alert('Server Error', `Message: ${result.error.message}\nStatus: ${result.error.status}\nCode: ${result.error.code}`);
+        if (error) {
+          // Check for specific common errors
+          if (error.message.includes('Invalid login credentials')) {
+            toastRef.current?.show('Invalid email or password.', 'error');
+            setLoading(false);
             return;
           }
-
-          console.log("LOGIN SUCCESS:", result.data.user?.email);
-          Alert.alert('Success', 'Login successful!');
-        } catch (err: any) {
-          console.log(`[Login] Attempt ${attempts} Failed:`, err.message);
-          
-          if (attempts < maxRetries && (err.message.includes('Network') || err.message.includes('timed out'))) {
-            console.log('[Login] Retrying in 2 seconds...');
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            return attemptSignIn();
-          } else {
-            Alert.alert('Network Failure', `Exhausted ${maxRetries} attempts.\nError: ${err.message}`);
-          }
+          throw error;
         }
-      };
 
-      await attemptSignIn();
-      setLoading(false);
-    }
+        if (data?.session) {
+          setLoginSuccess(true);
+        }
+      } catch (err: any) {
+        const isNetworkError = err.message.toLowerCase().includes('network') || 
+                              err.message.toLowerCase().includes('fetch');
+
+        if (attempt < maxRetries && isNetworkError) {
+          const delay = baseDelay * Math.pow(2, attempt);
+          console.log(`[Auth] Network failure. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return performSignIn(attempt + 1);
+        }
+
+        setLoading(false);
+        toastRef.current?.show('Connection issue. Please try again.', 'error');
+      }
+    };
+
+    await performSignIn(0);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <Toast ref={toastRef} />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
@@ -108,7 +131,6 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          {/* Nature Themed Header Background */}
           <View style={styles.headerBackground}>
             <LinearGradient
               colors={['#f0fdf4', '#dcfce7', '#ffffff']}
@@ -125,7 +147,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <View style={styles.logoContainer}>
               <LinearGradient
-                colors={['#10b981', '#059669']}
+                colors={[COLORS.primaryGreen, '#059669']}
                 style={styles.logoGradient}
               >
                 <Image 
@@ -150,6 +172,7 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   value={email}
                   onChangeText={setEmail}
+                  placeholderTextColor="#94a3b8"
                 />
               </View>
             </View>
@@ -164,15 +187,16 @@ export default function LoginScreen() {
                   secureTextEntry
                   value={password}
                   onChangeText={setPassword}
+                  placeholderTextColor="#94a3b8"
                 />
               </View>
             </View>
 
             <TouchableOpacity 
-              activeOpacity={0.9}
+              activeOpacity={0.8}
               style={styles.loginBtnContainer} 
               onPress={handleLogin}
-              disabled={loading}
+              disabled={loading || loginSuccess}
             >
               <LinearGradient
                 colors={['#10b981', '#059669']}
@@ -182,7 +206,7 @@ export default function LoginScreen() {
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <>
-                    <Text style={styles.loginBtnText}>Sign In Smoothly</Text>
+                    <Text style={styles.loginBtnText}>Sign In</Text>
                     <ArrowRight size={20} color="#FFFFFF" />
                   </>
                 )}
@@ -203,11 +227,61 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {loginSuccess && (
+        <Animated.View 
+          entering={FadeIn}
+          style={styles.successOverlay}
+        >
+          <LinearGradient
+            colors={[COLORS.primaryGreen, '#059669']}
+            style={styles.successGradient}
+          >
+            <Animated.View entering={ZoomIn.delay(200)} style={styles.successIconContainer}>
+              <Leaf color={COLORS.white} size={60} />
+            </Animated.View>
+            <Text style={styles.successTitle}>Welcome Back!</Text>
+            <Text style={styles.successSubtitle}>Preparing your fresh experience...</Text>
+            <ActivityIndicator color={COLORS.white} style={{ marginTop: 24 }} />
+          </LinearGradient>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  successOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+  },
+  successGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  successIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  successTitle: {
+    color: COLORS.white,
+    fontSize: 32,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   container: { flex: 1 },
   scrollContent: { flexGrow: 1 },
@@ -243,19 +317,19 @@ const styles = StyleSheet.create({
   },
   logoGradient: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   logo: { width: 70, height: 70, borderRadius: 35 },
-  title: { fontFamily: 'Outfit_700Bold', fontSize: 32, color: '#064e3b' },
-  subtitle: { fontFamily: 'Poppins_400Regular', fontSize: 15, color: '#065f46', textAlign: 'center', marginTop: 8, opacity: 0.7 },
+  title: { fontSize: 32, color: '#064e3b', fontWeight: '900' },
+  subtitle: { fontSize: 15, color: '#065f46', textAlign: 'center', marginTop: 8, opacity: 0.7 },
   form: { padding: 30, paddingBottom: 50 },
   inputGroup: { marginBottom: 15 },
-  label: { fontFamily: 'Outfit_600SemiBold', fontSize: 14, color: '#374151', marginBottom: 8, marginLeft: 4 },
+  label: { fontSize: 14, color: '#374151', marginBottom: 8, marginLeft: 4, fontWeight: '600' },
   inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: '#e5e7eb' },
   input: { flex: 1, paddingVertical: 16, marginLeft: 12, fontSize: 16, color: '#111827' },
   loginBtnContainer: { marginTop: 25, borderRadius: 18, overflow: 'hidden', elevation: 8, shadowColor: '#10b981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12 },
   loginBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 18 },
-  loginBtnText: { color: '#FFFFFF', fontSize: 17, fontFamily: 'Outfit_700Bold', marginRight: 10 },
+  loginBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginRight: 10 },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 25 },
   footerText: { fontSize: 15, color: '#6b7280' },
-  link: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: '#059669' },
+  link: { fontSize: 15, color: '#059669', fontWeight: '700' },
   legal: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 40 },
   legalText: { fontSize: 12, color: '#9ca3af', marginRight: 4 },
 });

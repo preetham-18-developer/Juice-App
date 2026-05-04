@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Platform, ActivityIndicator } from 'react-native';
 import { COLORS, TYPOGRAPHY, RADIUS, SPACING } from '../theme/tokens';
 import { ShoppingCart, Star } from 'lucide-react-native';
 
@@ -23,6 +23,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart,
   isAvailable = true,
 }) => {
+  const [isAdding, setIsAdding] = React.useState(false);
+
+  const handleAdd = () => {
+    if (isAdding) return;
+    setIsAdding(true);
+    onAddToCart();
+    setTimeout(() => setIsAdding(false), 1000);
+  };
+
   return (
     <TouchableOpacity 
       style={[styles.card, !isAvailable && styles.disabledCard]} 
@@ -58,11 +67,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </View>
           
           <TouchableOpacity 
-            style={[styles.addButton, !isAvailable && styles.disabledAddButton]} 
-            onPress={onAddToCart}
-            disabled={!isAvailable}
+            style={[
+              styles.addButton, 
+              !isAvailable && styles.disabledAddButton,
+              isAdding && { backgroundColor: '#10B981' }
+            ]} 
+            onPress={handleAdd}
+            disabled={!isAvailable || isAdding}
           >
-            <ShoppingCart size={18} color={COLORS.white} />
+            {isAdding ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <ShoppingCart size={18} color={COLORS.white} />
+            )}
           </TouchableOpacity>
         </View>
       </View>

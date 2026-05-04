@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -16,6 +17,10 @@ import { supabase } from '../lib/supabase';
 import { useRouter } from 'expo-router';
 import { Phone, ArrowRight, User, Mail, ShieldCheck, CheckCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Toast, ToastHandle } from '../src/components/ui/Toast';
+import { Celebration } from '../src/components/ui/Celebration';
+import { COLORS } from '../src/theme/tokens';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 export default function SignupScreen() {
   const [name, setName] = useState('');
@@ -26,74 +31,46 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [signupDone, setSignupDone] = useState(false);
   const router = useRouter();
+  const toastRef = React.useRef<ToastHandle>(null);
 
   const handleSignup = async () => {
     if (!name.trim() || !email.trim() || !phone.trim() || !password || !confirmPassword) {
-      return Alert.alert('Missing Fields', 'Please fill in all fields.');
+      return toastRef.current?.show('Please fill in all fields.', 'error');
     }
     if (password !== confirmPassword) {
-      return Alert.alert('Password Mismatch', 'Passwords do not match.');
+      return toastRef.current?.show('Passwords do not match.', 'error');
     }
     if (password.length < 6) {
-      return Alert.alert('Weak Password', 'Password must be at least 6 characters.');
+      return toastRef.current?.show('Password must be at least 6 chars.', 'error');
     }
 
     setLoading(true);
-    let attempts = 0;
-    const maxRetries = 3;
-
-    const attemptSignUp = async (): Promise<any> => {
-      attempts++;
-      console.log(`[Signup] Attempt ${attempts}/${maxRetries} for:`, email.trim());
-
-      try {
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Network connection timed out.')), 15000)
-        );
-
-        const { data, error } = (await Promise.race([
-          supabase.auth.signUp({
-            email: email.trim().toLowerCase(),
-            password,
-            options: {
-              data: { full_name: name.trim(), phone: phone.trim() }
-            }
-          }),
-          timeoutPromise
-        ])) as { data: any; error: any };
-
-        if (error) {
-          console.log("AUTH ERROR FULL:", JSON.stringify(error, null, 2));
-          Alert.alert('Signup Rejected', `Message: ${error.message}\nStatus: ${error.status}\nCode: ${error.code}`);
-          return;
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: { full_name: name.trim(), phone: phone.trim() }
         }
+      });
 
-        console.log("SIGNUP SUCCESS:", data?.user?.id);
+      if (error) throw error;
 
-        if (data?.user && !data.session) {
-          setSignupDone(true);
-        }
-      } catch (err: any) {
-        console.log(`[Signup] Attempt ${attempts} Failed:`, err.message);
-        
-        if (attempts < maxRetries && (err.message.includes('Network') || err.message.includes('timed out'))) {
-          console.log('[Signup] Retrying in 2 seconds...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          return attemptSignUp();
-        } else {
-          Alert.alert('Network Failure', `Exhausted ${maxRetries} attempts.\nError: ${err.message}`);
-        }
+      if (data?.user) {
+        setSignupDone(true);
       }
-    };
-
-    await attemptSignUp();
-    setLoading(false);
+    } catch (err: any) {
+      toastRef.current?.show(err.message || 'Signup failed', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ── Post-signup confirmation screen ──────────────────────────────────────
   if (signupDone) {
     return (
       <SafeAreaView style={styles.safeArea}>
+        <Celebration />
         <View style={styles.successContainer}>
           <View style={styles.successIcon}>
             <CheckCircle size={72} color="#10B981" />
@@ -263,14 +240,12 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '800',
     color: '#1e293b',
-    fontFamily: 'Outfit_700Bold',
   },
   subtitle: {
     fontSize: 15,
     color: '#64748b',
     textAlign: 'center',
     marginTop: 8,
-    fontFamily: 'Poppins_400Regular',
   },
 
   form: { padding: 28, marginTop: 8 },
@@ -282,7 +257,6 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
     marginLeft: 4,
-    fontFamily: 'Outfit_600SemiBold',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -299,7 +273,6 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 15,
     color: '#1e293b',
-    fontFamily: 'Poppins_400Regular',
   },
 
   signupBtnContainer: {
@@ -322,12 +295,12 @@ const styles = StyleSheet.create({
   signupBtnText: {
     color: '#fff',
     fontSize: 17,
-    fontFamily: 'Outfit_700Bold',
+    fontWeight: '800',
   },
 
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 28 },
   footerText: { fontSize: 14, color: '#94a3b8' },
-  link: { fontSize: 14, fontWeight: '800', color: '#FF7700', fontFamily: 'Outfit_700Bold' },
+  link: { fontSize: 14, fontWeight: '800', color: '#FF7700' },
 
   // ── Success screen ──────────────────────────────────────────────────────
   successContainer: {
@@ -349,7 +322,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     color: '#1e293b',
-    fontFamily: 'Outfit_700Bold',
     marginBottom: 12,
   },
   successBody: {
@@ -357,12 +329,10 @@ const styles = StyleSheet.create({
     color: '#475569',
     textAlign: 'center',
     lineHeight: 24,
-    fontFamily: 'Poppins_400Regular',
   },
   emailHighlight: {
     fontWeight: '700',
     color: '#059669',
-    fontFamily: 'Outfit_700Bold',
   },
   successNote: {
     fontSize: 14,
@@ -372,7 +342,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 36,
     paddingHorizontal: 12,
-    fontFamily: 'Poppins_400Regular',
   },
   goLoginBtn: {
     width: '100%',
@@ -395,7 +364,6 @@ const styles = StyleSheet.create({
   goLoginText: {
     color: '#fff',
     fontSize: 17,
-    fontFamily: 'Outfit_700Bold',
     fontWeight: '800',
   },
   resendBtn: { paddingVertical: 12 },

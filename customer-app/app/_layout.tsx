@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -53,7 +54,8 @@ export default function RootLayout() {
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`[Auth] Event: ${event}, Session: ${session ? 'Active' : 'Null'}`);
       setSession(session);
     });
 
@@ -68,13 +70,16 @@ export default function RootLayout() {
     const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup';
     const isRoot = !segments.length || segments[0] === 'index';
 
-    if (!session) {
+    if (!session || !session.user) {
+      console.log("[Auth] No session found, redirecting to signup");
       if (!inAuthGroup) {
         router.replace('/signup');
       }
     } else {
       const checkAdmin = async () => {
         try {
+          if (!session.user.id) return;
+          
           const { data, error } = await supabase
             .from('profiles')
             .select('role')
@@ -82,7 +87,7 @@ export default function RootLayout() {
             .single();
 
           if (error) {
-            console.error("Profile Fetch Error:", error.message);
+            console.log("[Auth] Profile fetch error (likely missing):", error.message);
             if (inAuthGroup || isRoot) {
               router.replace('/(tabs)');
             }
@@ -90,11 +95,16 @@ export default function RootLayout() {
           }
 
           if (data?.role === 'admin') {
+            console.log("[Auth] Admin detected. Current segment:", segments[0]);
             if (segments[0] !== 'admin') {
+              console.log("[Auth] Redirecting to Admin area...");
               router.replace('/admin');
             }
-          } else if (inAuthGroup || isRoot) {
-            router.replace('/(tabs)');
+          } else {
+            console.log("[Auth] Customer detected. Current segment:", segments[0]);
+            if (inAuthGroup || isRoot || segments[0] === 'admin') {
+              router.replace('/(tabs)');
+            }
           }
         } catch (err: any) {
           console.error("Layout Role Check Error:", err);
@@ -139,9 +149,9 @@ export default function RootLayout() {
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="signup" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="admin/index" options={{ headerShown: false }} />
+              <Stack.Screen name="admin" options={{ headerShown: false }} />
               <Stack.Screen name="product/[id]" options={{ title: 'Fresh Pick' }} />
-              <Stack.Screen name="cart" options={{ title: 'My Basket', presentation: 'modal' }} />
+              <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
               <Stack.Screen name="orders/[id]" options={{ title: 'Order Details' }} />
             </Stack>
           </View>

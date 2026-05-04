@@ -13,13 +13,15 @@ import {
   Platform,
   ActivityIndicator
 } from 'react-native';
-import { supabase } from '../lib/supabase';
-import { useCartStore } from '../src/store/useCartStore';
+import { supabase } from '../../lib/supabase';
+import { useCartStore } from '../../src/store/useCartStore';
 import { Trash2, Plus, Minus, ChevronRight, ShoppingBag, CreditCard, Banknote, CheckCircle2, Download, Eye, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+
+import { Toast, ToastHandle } from '../../src/components/ui/Toast';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +33,7 @@ export default function CartScreen() {
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const toastRef = React.useRef<ToastHandle>(null);
 
   const handleCheckout = async () => {
     try {
@@ -193,7 +196,7 @@ export default function CartScreen() {
         <Text style={styles.emptySubtitle}>Looks like you haven't added anything to your cart yet.</Text>
         <TouchableOpacity 
           style={styles.browseButton} 
-          onPress={() => router.replace('/')}
+          onPress={() => router.replace('/(tabs)')}
         >
           <Text style={styles.browseButtonText}>Browse Products</Text>
         </TouchableOpacity>
@@ -203,6 +206,7 @@ export default function CartScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Toast ref={toastRef} />
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.itemList}>
           {items.map((item) => (

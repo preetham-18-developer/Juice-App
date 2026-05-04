@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -20,6 +21,7 @@ import { useCartStore } from '../../src/store/useCartStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { Toast, ToastHandle } from '../../src/components/ui/Toast';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +35,7 @@ export default function ProductDetail() {
   const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
   const insets = useSafeAreaInsets();
+  const toastRef = React.useRef<ToastHandle>(null);
 
   const cartScale = useSharedValue(1);
 
@@ -74,7 +77,8 @@ export default function ProductDetail() {
         cartScale.value = withSpring(1);
       });
       addItem(product, isJuice ? selectedVariant! : undefined, isJuice ? 1 : weight);
-      setTimeout(() => router.push('/cart'), 300);
+      toastRef.current?.show('Added to your basket! 🧺', 'success');
+      setTimeout(() => router.push('/(tabs)/cart'), 800);
     }
   };
 
@@ -93,11 +97,12 @@ export default function ProductDetail() {
   const isJuice = product.category === 'juice';
   const currentPrice = isJuice 
     ? (selectedVariant?.price || 0) 
-    : (product.price_per_kg || 0) * weight;
+    : (product.price_per_kg || product.price || 0) * weight;
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+      <Toast ref={toastRef} />
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
         <View style={styles.imageContainer}>
           <Image 

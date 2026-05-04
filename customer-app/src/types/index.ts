@@ -8,6 +8,7 @@ export interface Product {
   category: Category;
   is_available: boolean;
   price_per_kg?: number;
+  price?: number;
   stock_kg?: number;
 }
 

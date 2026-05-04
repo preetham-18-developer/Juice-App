@@ -31,7 +31,9 @@ export const useCartStore = create<CartStore>((set, get) => ({
   addItem: (product, variant, quantity = 1) => {
     const isJuice = product.category === 'juice';
     const variantId = variant?.id;
-    const price = isJuice ? (variant?.price || 0) : (product.price_per_kg || 0);
+    const price = isJuice 
+      ? (variant?.price || product.price || 0) 
+      : (product.price_per_kg || product.price || 0);
     const cartItemId = isJuice ? `${product.id}-${variantId}` : product.id;
 
     set((state) => {
