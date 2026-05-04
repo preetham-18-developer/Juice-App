@@ -83,7 +83,7 @@ export default function LoginScreen() {
     const performSignIn = async (attempt: number): Promise<void> => {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           password,
         });
 
