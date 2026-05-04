@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  Platform,
   Switch
 } from 'react-native';
 import { User, MapPin, Settings, HelpCircle, ChevronRight, LogOut, Mail, Phone, Briefcase, Home } from 'lucide-react-native';
