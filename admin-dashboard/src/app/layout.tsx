@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
+import MobileNav from "@/components/layout/MobileNav";
 import BackgroundGradientSnippet from "@/components/ui/background-gradient-snippet";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -22,7 +23,8 @@ export default function RootLayout({
         <BackgroundGradientSnippet />
         <div className="relative z-10">
           <Sidebar />
-          <main className="md:ml-64 min-h-screen p-4 md:p-8">
+          <MobileNav />
+          <main className="md:ml-64 min-h-screen p-4 md:p-8 pb-24 md:pb-8">
             {children}
           </main>
         </div>

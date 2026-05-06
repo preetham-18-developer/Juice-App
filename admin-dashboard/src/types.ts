@@ -6,6 +6,7 @@ export interface Product {
   image_url: string;
   is_available: boolean;
   price_per_kg?: number;
+  stock_kg?: number;
   juice_variants?: JuiceVariant[];
 }
 
@@ -15,6 +16,7 @@ export interface JuiceVariant {
   variant_type: 'normal' | 'very_pure';
   price: number;
   ml: number;
+  stock_units: number;
 }
 
 export interface Profile {

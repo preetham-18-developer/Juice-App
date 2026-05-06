@@ -13,7 +13,7 @@ export default function OrderManagement() {
     if (showLoading) setLoading(true);
     const { data, error } = await supabase
       .from('orders')
-      .select('*, profiles(*), order_items(*)')
+      .select('*, profiles(*), order_items(*, products(*))')
       .order('created_at', { ascending: false });
     
     if (error) console.error(error);
@@ -27,7 +27,7 @@ export default function OrderManagement() {
     async function initialFetch() {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, profiles(*), order_items(*)')
+        .select('*, profiles(*), order_items(*, products(*))')
         .order('created_at', { ascending: false });
       
       if (isMounted) {
@@ -42,10 +42,8 @@ export default function OrderManagement() {
     // Subscribe to new orders
     const subscription = supabase
       .channel('orders-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
-        if (isMounted) {
-          setOrders(prev => [payload.new as Order, ...prev]);
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+        fetchOrders(false);
       })
       .subscribe();
 
@@ -139,7 +137,7 @@ export default function OrderManagement() {
                 <div className="space-y-2">
                   {order.order_items?.map((item, idx) => (
                     <div key={idx} className="flex justify-between text-sm">
-                      <span className="text-gray-600">{item.quantity}x Product</span>
+                      <span className="text-gray-600">{item.quantity}x {item.products?.name || 'Product'}</span>
                       <span className="font-medium text-gray-900">₹{item.subtotal}</span>
                     </div>
                   ))}
