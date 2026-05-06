@@ -1,39 +1,44 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, useWindowDimensions } from 'react-native';
 import { COLORS, TYPOGRAPHY, RADIUS, SPACING } from '../theme/tokens';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export const HeroBanner = () => {
+  const { width: windowWidth } = useWindowDimensions();
   const floatAnim = React.useRef(new Animated.Value(0)).current;
+  
+  const isLargeScreen = windowWidth > 768;
+  const imageSize = isLargeScreen ? 200 : 120;
+  const imageHeight = isLargeScreen ? 260 : 160;
 
   React.useEffect(() => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, {
-          toValue: -10,
-          duration: 2000,
-          useNativeDriver: false,
+          toValue: -12,
+          duration: 2500,
+          useNativeDriver: true,
         }),
         Animated.timing(floatAnim, {
           toValue: 0,
-          duration: 2000,
-          useNativeDriver: false,
+          duration: 2500,
+          useNativeDriver: true,
         }),
       ])
     ).start();
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isLargeScreen && { maxWidth: 1200, alignSelf: 'center', width: '100%' }]}>
       <LinearGradient
         colors={['#FFF1D6', '#FFE4B5']}
-        style={styles.gradient}
+        style={[styles.gradient, isLargeScreen && { padding: SPACING.xl }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.leftContent}>
-          <Text style={styles.title}>There is a juice for every occasion.</Text>
-          <Text style={styles.subtext}>Freshly squeezed with love and care.</Text>
+          <Text style={[styles.title, isLargeScreen && { fontSize: 32, lineHeight: 40 }]}>There is a juice for every occasion.</Text>
+          <Text style={[styles.subtext, isLargeScreen && { fontSize: 18 }]}>Freshly squeezed with love and care.</Text>
           
           <View style={styles.statsRow}>
             <View style={styles.stat}>
@@ -59,8 +64,8 @@ export const HeroBanner = () => {
 
         <Animated.View style={[styles.imageContainer, { transform: [{ translateY: floatAnim }] }]}>
           <Image 
-            source={{ uri: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?q=80&w=300' }} 
-            style={styles.heroImage}
+            source={{ uri: 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?q=80&w=400' }} 
+            style={[styles.heroImage, { width: imageSize, height: imageHeight }]}
             resizeMode="contain"
           />
         </Animated.View>
@@ -79,7 +84,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 200,
+    minHeight: 220,
   },
   leftContent: {
     flex: 1,
@@ -89,10 +94,12 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.h2,
     lineHeight: 28,
     marginBottom: SPACING.xs,
+    color: '#3d2b1f',
   },
   subtext: {
     ...TYPOGRAPHY.subtext,
     marginBottom: SPACING.md,
+    color: '#5c4d42',
   },
   statsRow: {
     flexDirection: 'row',
@@ -114,27 +121,33 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: 20,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: 'rgba(0,0,0,0.1)',
     marginHorizontal: 12,
   },
   ctaButton: {
     backgroundColor: COLORS.primaryGreen,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
     borderRadius: RADIUS.full,
     alignSelf: 'flex-start',
+    elevation: 4,
+    shadowColor: COLORS.primaryGreen,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   ctaText: {
     color: COLORS.white,
-    fontWeight: 'bold',
+    fontWeight: '900',
     fontSize: 14,
+    letterSpacing: 1,
   },
   imageContainer: {
     flex: 0.5,
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   heroImage: {
-    width: 120,
-    height: 160,
+    // Width and height handled dynamically
   },
 });

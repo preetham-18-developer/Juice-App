@@ -21,6 +21,7 @@ import Animated, {
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS } from '../../theme/tokens';
+import { ProductService } from '../../services/ProductService';
 import { Star, ShoppingCart, Heart } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -59,6 +60,10 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
   onLike,
   variant = 'elevated'
 }) => {
+  const { width: windowWidth } = Dimensions.get('window');
+  const isWeb = Platform.OS === 'web';
+  const isLargeScreen = windowWidth > 768;
+
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
 
@@ -105,11 +110,15 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
           !isAvailable && styles.disabled
         ]}
       >
-        <View style={styles.imageWrapper}>
-          <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+        <View style={[styles.imageWrapper, { aspectRatio: 0.85 }]}>
+          <Image 
+            source={{ uri: imageUrl }} 
+            style={styles.image} 
+            resizeMode="contain" 
+          />
           {renderBadges()}
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.4)']}
+            colors={['transparent', 'rgba(0,0,0,0.5)']}
             style={styles.imageOverlay}
           />
           {!isAvailable && (
@@ -126,7 +135,7 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
           
           <View style={styles.footer}>
             <View>
-              <Text style={styles.priceSymbol}>₹<Text style={styles.price}>{price}</Text></Text>
+              <Text style={styles.priceSymbol}>{ProductService.formatPrice(price)}</Text>
               <Text style={styles.unit}>per unit</Text>
             </View>
 
@@ -157,7 +166,7 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: CARD_WIDTH,
+    width: '100%',
     marginBottom: SPACING.md,
   },
   pressable: {
@@ -184,9 +193,10 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   imageWrapper: {
-    height: 150,
     position: 'relative',
     overflow: 'hidden',
+    backgroundColor: '#f8fafc', // Light background for 'contain' mode
+    padding: 10,
   },
   image: {
     ...StyleSheet.absoluteFillObject,
@@ -300,4 +310,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PremiumCard;
+export default React.memo(PremiumCard);

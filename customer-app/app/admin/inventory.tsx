@@ -15,6 +15,7 @@ import {
 import { COLORS, SPACING, RADIUS } from '../../src/theme/tokens';
 import { supabase } from '../../lib/supabase';
 import { CheckCircle, AlertTriangle, XCircle, Package, Edit3 } from 'lucide-react-native';
+import { ProductService } from '../../src/services/ProductService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,7 +173,10 @@ function ProductInventoryCard({
       <View style={styles.cardTop}>
         <View style={{ flex: 1 }}>
           <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.productCategory}>{item.category.toUpperCase()}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.productCategory}>{item.category.toUpperCase()}</Text>
+            <Text style={styles.adminPrice}>{ProductService.formatPrice(ProductService.getPrice(item))}</Text>
+          </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
           <Icon size={13} color={cfg.color} />
@@ -262,7 +266,22 @@ export default function InventoryTracking() {
     [fetchInventory]
   );
 
-  useEffect(() => { fetchInventory(); }, []);
+  useEffect(() => { 
+    fetchInventory(); 
+    
+    // Realtime subscription for multi-admin sync
+    const channel = supabase
+      .channel('inventory_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        console.log("[AdminSync] Remote change detected. Fetching latest...");
+        fetchInventory(true);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Summary counts
   const inStock    = products.filter(p => deriveStockStatus(p) === 'IN_STOCK').length;
@@ -354,6 +373,12 @@ const styles = StyleSheet.create({
   productCategory: {
     fontSize: 10, fontWeight: '800', color: COLORS.mutedGray,
     letterSpacing: 1, marginTop: 3,
+  },
+  adminPrice: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primaryGreen,
+    marginTop: 3,
   },
   statusBadge: {
     flexDirection: 'row', alignItems: 'center',

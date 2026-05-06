@@ -1,232 +1,263 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ActivityIndicator, Alert, SafeAreaView, TouchableOpacity, Text } from 'react-native';
-import { WebView } from 'react-native-webview';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  StyleSheet, 
+  View, 
+  ActivityIndicator, 
+  Alert, 
+  SafeAreaView, 
+  TouchableOpacity, 
+  Text, 
+  Platform,
+  Dimensions
+} from 'react-native';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import axios from 'axios';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCartStore } from '../src/store/useCartStore';
 import { supabase } from '../lib/supabase';
+import { COLORS, TYPOGRAPHY, RADIUS, SPACING } from '../src/theme/tokens';
+import { ShieldCheck, AlertCircle, RefreshCw, ChevronLeft } from 'lucide-react-native';
+import { Toast, ToastHandle } from '../src/components/ui/Toast';
+import Animated, { FadeIn, FadeInUp, ZoomIn } from 'react-native-reanimated';
 
-// Use production backend URL.
-const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'https://razor-pay-backend-u1jy.onrender.com/api/payment';
+const BASE_API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://juice-app-9uzq.onrender.com';
+const BACKEND_URL = BASE_API_URL.endsWith('/api/payment') ? BASE_API_URL : `${BASE_API_URL}/api/payment`;
 
 export default function PaymentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { amount, name, email, contact } = params;
-  const { placeOrder } = useCartStore();
+  const { placeOrder, clearCart } = useCartStore();
+  const toastRef = useRef<ToastHandle>(null);
 
   const [orderId, setOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showWebView, setShowWebView] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [saveError, setSaveError] = useState<{msg: string, data: any} | null>(null);
 
-  // 1. Create Order in Razorpay
+  // 1. Create Razorpay Order
   const handlePayNow = async () => {
+    if (loading) return;
     try {
       setLoading(true);
-      
       const parsedAmount = Number(amount);
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
-         Alert.alert('Invalid Amount', 'Please provide a valid amount.');
-         setLoading(false);
-         return;
-      }
-
+      
       const response = await axios.post(`${BACKEND_URL}/create-order`, {
-        amount: parsedAmount, // in INR
+        amount: parsedAmount,
         currency: 'INR',
-        receipt: `receipt_${Date.now()}`,
+        receipt: `rcpt_${Date.now()}`,
       }, { timeout: 30000 });
 
-      if (response.data && response.data.success && response.data.order_id) {
+      if (response.data?.success && response.data?.order_id) {
         setOrderId(response.data.order_id);
         setShowWebView(true);
       } else {
-        Alert.alert('Payment Error', response.data?.message || 'Failed to initialize payment.');
+        toastRef.current?.show('Gateway busy. Please try again.', 'error');
       }
     } catch (error: any) {
-      console.error('Order creation error:', error);
-      const errorMsg = error.response?.data?.message || 'Cannot reach payment server. Please try again.';
-      Alert.alert('Connection Error', errorMsg);
+      toastRef.current?.show('Connection issue. Try again.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Handle WebView Messages (Success/Failure/Cancel)
-  const onMessage = async (event: any) => {
-    let message;
+  // 2. Finalize Order (Verification + DB Save)
+  const finalizeOrder = async (razorpayData: any) => {
+    setVerifying(true);
+    setSaveError(null);
+    
     try {
-      message = JSON.parse(event.nativeEvent.data);
-    } catch (e) {
-      console.error("Failed to parse WebView message", e);
-      return;
-    }
+      // Step A: Cryptographic Verification via Backend
+      const verifyRes = await axios.post(`${BACKEND_URL}/verify-payment`, {
+        razorpay_order_id: razorpayData.razorpay_order_id,
+        razorpay_payment_id: razorpayData.razorpay_payment_id,
+        razorpay_signature: razorpayData.razorpay_signature,
+      }, { timeout: 30000 });
 
-    setShowWebView(false);
-
-    if (message.status === 'success') {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = message.data;
-      
-      // 3. Verify Payment Signature
-      try {
-        setLoading(true);
-        const verifyRes = await axios.post(`${BACKEND_URL}/verify-payment`, {
-          razorpay_order_id,
-          razorpay_payment_id,
-          razorpay_signature,
-        }, { timeout: 30000 });
-
-        if (verifyRes.data && verifyRes.data.success) {
-          // 4. Place Order in Database
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const userAddress = user.user_metadata?.permanent_address || 'Default Address';
-            const dbOrderId = await placeOrder(user.id, userAddress, 'online');
-            
-            if (dbOrderId) {
-              Alert.alert('Payment Successful', 'Your order has been placed securely!');
-              router.replace('/(tabs)/orders');
-            } else {
-              Alert.alert('Action Required', 'Payment succeeded but order placement failed. Please contact support with your payment ID: ' + razorpay_payment_id);
-              router.replace('/(tabs)/orders');
-            }
-          } else {
-            Alert.alert('Session Expired', 'Please login to view your order.');
-            router.replace('/');
-          }
-        } else {
-          Alert.alert('Verification Failed', 'Payment signature is invalid. If money was deducted, it will be refunded.');
-        }
-      } catch (error: any) {
-        console.error('Verification error:', error);
-        Alert.alert('Verification Error', error.response?.data?.message || 'Failed to verify payment status.');
-      } finally {
-        setLoading(false);
+      if (!verifyRes.data || !verifyRes.data.success) {
+        throw new Error('Signature verification failed');
       }
-    } else if (message.status === 'cancelled') {
-      Alert.alert('Payment Cancelled', 'You cancelled the transaction.');
-    } else {
-      const failReason = message.data?.description || 'Unknown error occurred';
-      Alert.alert('Payment Failed', failReason);
+
+      // Step B: Atomic Database Insertion
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Session expired');
+
+      const address = user.user_metadata?.permanent_address || 'Current Location';
+      const dbOrderId = await placeOrder(user.id, address, 'online');
+
+      if (!dbOrderId) throw new Error('Order creation failed');
+
+      // SUCCESS: Clear cart and redirect
+      clearCart();
+      router.replace({
+        pathname: '/(tabs)/orders',
+        params: { success: 'true', orderId: dbOrderId }
+      });
+
+    } catch (err: any) {
+      console.error("[Payment] Atomicity failure:", err.message);
+      setSaveError({ msg: err.message, data: razorpayData });
+    } finally {
+      setVerifying(false);
     }
   };
 
+  const onMessage = (event: any) => {
+    setShowWebView(false);
+    try {
+      const data = typeof event.nativeEvent.data === 'string' 
+        ? JSON.parse(event.nativeEvent.data) 
+        : event.nativeEvent.data;
+      
+      const message = data.data || data;
+
+      if (data.status === 'success') {
+        finalizeOrder(message);
+      } else if (data.status === 'cancelled') {
+        toastRef.current?.show('Payment cancelled.', 'info');
+      } else {
+        toastRef.current?.show(data.message || 'Payment failed.', 'error');
+      }
+    } catch (e) {
+      console.error("[Payment] Message error:", e);
+      toastRef.current?.show('Invalid gateway response.', 'error');
+    }
+  };
+
+  // Web Listener
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleWebMessage = (e: MessageEvent) => {
+        try {
+          const message = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+          if (message.status) onMessage({ nativeEvent: { data: JSON.stringify(message) } } as any);
+        } catch (err) {}
+      };
+      window.addEventListener('message', handleWebMessage);
+      return () => window.removeEventListener('message', handleWebMessage);
+    }
+  }, []);
+
+  if (verifying) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={COLORS.primaryGreen} />
+          <Text style={styles.verifyTitle}>Verifying Payment...</Text>
+          <Text style={styles.verifySubtitle}>Please do not close the app or refresh.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (saveError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContent}>
+          <Animated.View entering={ZoomIn}>
+            <AlertCircle size={80} color="#ef4444" />
+          </Animated.View>
+          <Text style={[styles.title, { color: '#ef4444', marginTop: 20 }]}>Action Required</Text>
+          <Text style={styles.errorText}>Payment succeeded but we couldn't save your order due to a network glitch.</Text>
+          <Text style={styles.errorSub}>Payment ID: {saveError.data?.razorpay_payment_id}</Text>
+          
+          <TouchableOpacity style={styles.retryBtn} onPress={() => finalizeOrder(saveError.data)}>
+            <RefreshCw size={20} color="#fff" />
+            <Text style={styles.retryBtnText}>Retry Saving Order</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (showWebView && orderId) {
-    const checkoutUrl = `${BACKEND_URL}/checkout/${orderId}?amount=${Number(amount) * 100}&name=${encodeURIComponent(name as string || '')}&email=${encodeURIComponent(email as string || '')}&contact=${encodeURIComponent(contact as string || '')}`;
+    const checkoutUrl = `${BACKEND_URL}/checkout/${orderId}?amount=${Number(amount) * 100}&name=${encodeURIComponent(name as string)}&email=${encodeURIComponent(email as string)}&contact=${encodeURIComponent(contact as string)}`;
     
     return (
       <SafeAreaView style={styles.container}>
-        <WebView
-          source={{ uri: checkoutUrl }}
-          onMessage={onMessage}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          renderLoading={() => <ActivityIndicator size="large" color="#3A8C3F" style={styles.loader} />}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error('WebView error: ', nativeEvent);
-            setShowWebView(false);
-            Alert.alert("Connection Error", "Failed to load payment gateway.");
-          }}
-        />
+        <View style={styles.webViewHeader}>
+          <TouchableOpacity onPress={() => setShowWebView(false)}>
+            <ChevronLeft size={24} color={COLORS.darkText} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Secure Payment</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        {Platform.OS === 'web' ? (
+          <iframe src={checkoutUrl} style={styles.iframe} title="Payment" />
+        ) : (
+          <WebView 
+            source={{ uri: checkoutUrl }} 
+            onMessage={onMessage}
+            startInLoadingState 
+            renderLoading={() => <ActivityIndicator size="large" color={COLORS.primaryGreen} style={StyleSheet.absoluteFill} />}
+          />
+        )}
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Secure Checkout</Text>
-        <Text style={styles.amount}>₹{amount}</Text>
-        <Text style={styles.subtitle}>Powered by Razorpay</Text>
-        
-        <TouchableOpacity 
-          style={[styles.payButton, loading && styles.payButtonDisabled]} 
-          onPress={handlePayNow}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Pay Now</Text>
-          )}
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.cancelButton} 
-          onPress={() => router.back()}
-          disabled={loading}
-        >
-           <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
+      <Toast ref={toastRef} />
+      <View style={styles.main}>
+        <Animated.View entering={FadeInUp.delay(200)}>
+          <View style={styles.iconBox}>
+            <ShieldCheck size={48} color={COLORS.primaryGreen} />
+          </View>
+          <Text style={styles.title}>Secure Payment</Text>
+          <Text style={styles.subtitle}>Verify details and proceed to pay</Text>
+        </Animated.View>
+
+        <Animated.View entering={FadeInUp.delay(400)} style={styles.amountCard}>
+          <Text style={styles.amountLabel}>Total Payable Amount</Text>
+          <Text style={styles.amountValue}>₹{amount}</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>Razorpay Secure</Text>
+          </View>
+        </Animated.View>
+
+        <Animated.View entering={FadeInUp.delay(600)} style={styles.footer}>
+          <TouchableOpacity 
+            style={[styles.payBtn, loading && { opacity: 0.7 }]} 
+            onPress={handlePayNow}
+            disabled={loading}
+          >
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.payBtnText}>Proceed to Pay ₹{amount}</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Text style={styles.backBtnText}>Go Back</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF8E7',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 8,
-    color: '#1E293B',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 32,
-  },
-  amount: {
-    fontSize: 48,
-    fontWeight: '900',
-    color: '#3A8C3F',
-    marginBottom: 8,
-  },
-  payButton: {
-    backgroundColor: '#3A8C3F',
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 16,
-    width: '100%',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#3A8C3F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  payButtonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  cancelButton: {
-    marginTop: 16,
-    padding: 12,
-  },
-  cancelText: {
-    color: '#64748B',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loader: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -20 }, { translateY: -20 }],
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  main: { flex: 1, padding: 32, justifyContent: 'center' },
+  iconBox: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 24 },
+  title: { ...TYPOGRAPHY.h1, textAlign: 'center', color: COLORS.darkText },
+  subtitle: { ...TYPOGRAPHY.subtext, textAlign: 'center', marginBottom: 40 },
+  amountCard: { backgroundColor: '#f8fafc', padding: 40, borderRadius: 32, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  amountLabel: { fontSize: 14, color: COLORS.mutedGray, fontWeight: '600', marginBottom: 8 },
+  amountValue: { fontSize: 48, fontWeight: '900', color: COLORS.primaryGreen },
+  badge: { backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginTop: 16 },
+  badgeText: { fontSize: 10, fontWeight: '800', color: '#166534', textTransform: 'uppercase' },
+  footer: { marginTop: 60 },
+  payBtn: { backgroundColor: COLORS.primaryGreen, paddingVertical: 20, borderRadius: 20, alignItems: 'center', elevation: 8, shadowColor: COLORS.primaryGreen, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15 },
+  payBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  backBtn: { marginTop: 20, padding: 10, alignItems: 'center' },
+  backBtnText: { color: COLORS.mutedGray, fontWeight: '600' },
+  verifyTitle: { ...TYPOGRAPHY.h2, marginTop: 24 },
+  verifySubtitle: { color: COLORS.mutedGray, marginTop: 8 },
+  errorText: { fontSize: 16, color: COLORS.darkText, textAlign: 'center', marginTop: 16, lineHeight: 24 },
+  errorSub: { fontSize: 12, color: COLORS.mutedGray, marginTop: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  retryBtn: { flexDirection: 'row', gap: 10, backgroundColor: '#1e293b', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 16, marginTop: 32, alignItems: 'center' },
+  retryBtnText: { color: '#fff', fontWeight: 'bold' },
+  webViewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  headerTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.darkText },
+  iframe: { width: '100%', height: '100%', border: 'none' },
 });

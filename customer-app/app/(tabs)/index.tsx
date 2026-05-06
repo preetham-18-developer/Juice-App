@@ -5,6 +5,7 @@ import {
   Text, 
   StyleSheet, 
   ScrollView, 
+  FlatList,
   StatusBar,
   RefreshControl,
   TouchableOpacity,
@@ -13,7 +14,8 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
-  Pressable
+  Pressable,
+  useWindowDimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,19 +23,24 @@ import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../src/theme/tokens';
 import { Header } from '../../src/components/Header';
 import { HeroBanner } from '../../src/components/HeroBanner';
 import { CategoryPill } from '../../src/components/CategoryPill';
-import { ProductCard } from '../../src/components/ProductCard';
+import PremiumCard from '../../src/components/ui/PremiumCard';
 import { SkeletonLoader } from '../../src/components/SkeletonLoader';
 import { SearchBar } from '../../src/components/SearchBar';
 import { DestinationCard } from '../../src/components/ui/card';
 import { Toast, ToastHandle } from '../../src/components/ui/Toast';
+import { EmptyState } from '../../src/components/ui/EmptyState';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { useProducts } from '../../src/hooks/useProducts';
+import { analytics } from '../../src/services/AnalyticsService';
+import { ShoppingBag } from 'lucide-react-native';
 import { useDebounce } from '../../src/hooks/useDebounce';
 import { Product } from '../../src/types';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCartStore } from '../../src/store/useCartStore';
+import { ProductService } from '../../src/services/ProductService';
 import { Apple, Bean, Cherry, Citrus, Grape, Leaf, Filter, X, ChevronDown, Flame } from 'lucide-react-native';
 import Slideshow from '../../src/components/ui/slideshow';
+import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -49,16 +56,34 @@ export default function HomeScreen() {
   const { category: paramCategory } = useLocalSearchParams<{ category: string }>();
   const addItem = useCartStore((state) => state.addItem);
   const toastRef = useRef<ToastHandle>(null);
-  
-  const { products, loading, refreshing, error, refresh, retry } = useProducts();
-  
+  const { products, loading, refreshing, error, hasMore, loadMore, refresh, retry } = useProducts();
   const [activeCategory, setActiveCategory] = useState('all');
+  
+  const { width: windowWidth } = useWindowDimensions();
+  const numColumns = windowWidth > 1024 ? 4 : windowWidth > 768 ? 3 : 2;
+  const gridGap = 16;
+  const cardWidth = (windowWidth - 40 - (gridGap * (numColumns - 1))) / numColumns;
 
   useEffect(() => {
     if (paramCategory) {
       setActiveCategory(paramCategory);
     }
   }, [paramCategory]);
+  useEffect(() => {
+    // Realtime subscription for product updates
+    const channel = supabase
+      .channel('public:products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        console.log("[Realtime] Product change detected. Refreshing...");
+        refresh();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
   
@@ -127,9 +152,7 @@ export default function HomeScreen() {
         </View>
       ))}
     </View>
-  );
-
-  return (
+  )  return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <Header />
@@ -143,128 +166,98 @@ export default function HomeScreen() {
         onFilterPress={() => setFilterVisible(true)}
       />
 
-      <ScrollView 
+      <FlatList
+        data={filteredProducts}
+        keyExtractor={(item) => item.id}
+        numColumns={numColumns}
+        key={numColumns}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        stickyHeaderIndices={[3]}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={refresh} 
-            tintColor={COLORS.primaryGreen}
-            colors={[COLORS.primaryGreen]}
-          />
+        onRefresh={refresh}
+        refreshing={refreshing}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        initialNumToRender={8}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+        ListHeaderComponent={
+          <>
+            <Slideshow />
+            <HeroBanner />
+            <View style={styles.promoSection}>
+               <LinearGradient
+                 colors={['#FFECD2', '#FCB69F']}
+                 style={styles.promoCard}
+                 start={{x: 0, y: 0}}
+                 end={{x: 1, y: 1}}
+               >
+                 <View>
+                   <Text style={styles.promoTitle}>Super Fresh Sale!</Text>
+                   <Text style={styles.promoSubtitle}>Get up to 30% off on all juices</Text>
+                 </View>
+                 <Flame color="#FF512F" size={32} />
+               </LinearGradient>
+            </View>
+
+            <View style={styles.categoryContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
+                {CATEGORIES.map((cat) => (
+                  <CategoryPill
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon ? React.cloneElement(cat.icon as React.ReactElement, { 
+                      color: activeCategory === cat.id ? COLORS.white : COLORS.darkText 
+                    }) : null}
+                    active={activeCategory === cat.id}
+                    onPress={() => setActiveCategory(cat.id)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.sectionHeader}>
+              <View style={{ paddingHorizontal: 20, marginVertical: 16 }}>
+                <Text style={TYPOGRAPHY.h2}>
+                  {activeCategory === 'all' ? 'Popular Items' : `${activeCategory.charAt(0).toUpperCase()}${activeCategory.slice(1)}s`}
+                </Text>
+                <Text style={styles.subtitleText}>Hand-picked freshness for you</Text>
+              </View>
+            </View>
+          </>
         }
-      >
-        <Slideshow />
-        <HeroBanner />
-        
-        <View style={styles.promoSection}>
-           <LinearGradient
-             colors={['#FFECD2', '#FCB69F']}
-             style={styles.promoCard}
-             start={{x: 0, y: 0}}
-             end={{x: 1, y: 1}}
-           >
-             <View>
-               <Text style={styles.promoTitle}>Super Fresh Sale!</Text>
-               <Text style={styles.promoSubtitle}>Get up to 30% off on all juices</Text>
-             </View>
-             <Flame color="#FF512F" size={32} />
-           </LinearGradient>
-        </View>
-
-        <View style={styles.categoryContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
-            {CATEGORIES.map((cat) => (
-              <CategoryPill
-                key={cat.id}
-                label={cat.label}
-                icon={cat.icon ? React.cloneElement(cat.icon as React.ReactElement, { 
-                  color: activeCategory === cat.id ? COLORS.white : COLORS.darkText 
-                }) : null}
-                active={activeCategory === cat.id}
-                onPress={() => setActiveCategory(cat.id)}
-              />
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={TYPOGRAPHY.h2}>
-                {activeCategory === 'all' ? 'Popular Items' : `${activeCategory.charAt(0).toUpperCase()}${activeCategory.slice(1)}s`}
-              </Text>
-              <Text style={styles.subtitleText}>Hand-picked freshness for you</Text>
-            </View>
-            <TouchableOpacity onPress={() => setFilterVisible(true)} style={styles.sortBadge}>
-               <Text style={styles.sortBadgeText}>{selectedSort === 'popular' ? 'Popular' : 'Price Sorted'}</Text>
-               <ChevronDown size={14} color={COLORS.primaryGreen} />
-            </TouchableOpacity>
+        renderItem={({ item, index }) => (
+          <View style={{ width: cardWidth, marginHorizontal: 8, marginBottom: 16 }}>
+            <PremiumCard
+              id={item.id}
+              index={index}
+              title={item.name}
+              subtitle={item.description}
+              price={ProductService.getPrice(item)}
+              imageUrl={ProductService.getOptimizedImage(item.image_url, 400)}
+              category={item.category}
+              isAvailable={item.is_available}
+              onPress={() => router.push({ pathname: '/product/[id]', params: { id: item.id } })}
+              onAddToCart={() => handleAddToCart(item)}
+            />
           </View>
+        )}
+        ListEmptyComponent={loading ? renderSkeleton() : (
+          <EmptyState 
+            icon={ShoppingBag} 
+            title="No matches found" 
+            subtitle="Try adjusting your filters or search query." 
+            actionLabel="View All Products"
+            onAction={() => setActiveCategory('all')}
+          />
+        )}
+        ListFooterComponent={hasMore && products.length > 0 ? (
+          <View style={{ paddingVertical: 20 }}>
+            <ActivityIndicator color={COLORS.primaryGreen} />
+          </View>
+        ) : null}
+      />
 
-          {loading ? (
-            renderSkeleton()
-          ) : error ? (
-            <View style={styles.errorContainer}>
-              <X size={48} color={COLORS.error} />
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={retry}>
-                <Text style={styles.retryText}>Retry Loading</Text>
-              </TouchableOpacity>
-            </View>
-          ) : filteredProducts.length > 0 ? (
-            <Animated.View style={[styles.grid, { opacity: fadeAnim }]}>
-              {filteredProducts.map((item, index) => {
-                const isJuice = item.category?.toLowerCase().includes('juice');
-                return isJuice ? (
-                  <DestinationCard
-                    key={item.id}
-                    id={item.id}
-                    index={index}
-                    imageUrl={item.image_url || 'https://images.unsplash.com/photo-1622597467827-4309112bba21?w=400'}
-                    category="Pure Juice"
-                    title={item.name}
-                    price={item.price || 80}
-                    onPress={() => router.push({ pathname: '/product/[id]', params: { id: item.id } })}
-                    onAddToCart={() => handleAddToCart(item)}
-                  />
-                ) : (
-                  <ProductCard
-                    key={item.id}
-                    id={item.id}
-                    index={index}
-                    name={item.name}
-                    price={item.price_per_kg || item.price || 80}
-                    image={item.image_url || 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400'}
-                    onPress={() => router.push({ pathname: '/product/[id]', params: { id: item.id } })}
-                    onAddToCart={() => handleAddToCart(item)}
-                    isAvailable={item.is_available}
-                  />
-                );
-              })}
-            </Animated.View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Leaf size={64} color={COLORS.mutedGray} />
-              <Text style={styles.emptyTitle}>No harvest matches</Text>
-              <Text style={styles.emptySubtitle}>Try adjusting your filters or search query</Text>
-              <TouchableOpacity style={styles.resetButton} onPress={() => {
-                setSearchQuery('');
-                setActiveCategory('all');
-                setPriceRange(500);
-                setSelectedSort('popular');
-              }}>
-                <Text style={styles.resetText}>Clear All Filters</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-        <View style={{ height: 60 }} />
-      </ScrollView>
-
-      {/* Modern Filter Sheet */}
       <Modal
         visible={filterVisible}
         animationType="slide"
@@ -334,8 +327,16 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.creamBackground },
-  scrollContent: { paddingBottom: 40 },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.creamBackground,
+    alignItems: 'center' 
+  },
+  scrollContent: { 
+    width: '100%',
+    maxWidth: 1200, // Maximum width for Laptop screens
+    paddingBottom: 40,
+  },
   promoSection: { paddingHorizontal: SPACING.md, marginTop: SPACING.md },
   promoCard: { 
     flexDirection: 'row', 
@@ -376,8 +377,9 @@ const styles = StyleSheet.create({
   grid: { 
     flexDirection: 'row', 
     flexWrap: 'wrap', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: SPACING.md 
+    justifyContent: 'center', // Center cards on web
+    paddingHorizontal: SPACING.md,
+    gap: 16
   },
   skeletonCard: { width: '48%', marginBottom: SPACING.xl },
   errorContainer: { alignItems: 'center', padding: 40, marginTop: 40 },

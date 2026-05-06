@@ -22,7 +22,9 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
 import { Toast, ToastHandle } from '../../src/components/ui/Toast';
+import { ProductService } from '../../src/services/ProductService';
 import AddressPicker, { AddressData } from '../../src/components/AddressPicker';
+import { EmptyState } from '../../src/components/ui/EmptyState';
 
 const { width } = Dimensions.get('window');
 
@@ -37,31 +39,51 @@ export default function CartScreen() {
   const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
   const toastRef = React.useRef<ToastHandle>(null);
 
+  const handleAddressSelect = React.useCallback((addr: AddressData) => {
+    console.log("[Cart] Address selected:", addr.formattedAddress);
+    setSelectedAddress(addr);
+  }, []);
+
   const handleCheckout = async () => {
     try {
       setLoading(true);
+      console.log("[Checkout] Initiating checkout process...");
+      
       const { data: { user }, error } = await supabase.auth.getUser();
       
       if (error || !user) {
-        Alert.alert('Login Required', 'Please login to place an order', [
-          { text: 'Login', onPress: () => router.push('/login') }
-        ]);
+        console.warn("[Checkout] Auth failure:", error?.message);
+        toastRef.current?.show('Please login to place an order.', 'error');
         setLoading(false);
         return;
       }
 
-      if (!selectedAddress && !user.user_metadata?.permanent_address) {
-        Alert.alert('Address Required', 'Please select or enter a delivery address');
+      // 1. Validate Address (with fallback formatting)
+      let effectiveAddress = selectedAddress?.formattedAddress;
+      
+      if (!effectiveAddress && selectedAddress) {
+        const parts = [selectedAddress.street, selectedAddress.locality, selectedAddress.city].filter(Boolean);
+        effectiveAddress = parts.join(', ');
+      }
+
+      if (!effectiveAddress || effectiveAddress.trim().length < 5) {
+        toastRef.current?.show(
+          !selectedAddress ? "Please select a delivery address." : "Address is too short.", 
+          'error'
+        );
         setLoading(false);
         return;
       }
+
+      console.log("[Checkout] Validated Address:", effectiveAddress);
 
       const totalAmount = getTotal();
       if (totalAmount <= 0) {
-        Alert.alert('Invalid Cart', 'Your cart is empty or total is invalid.');
-        setLoading(false);
+        Alert.alert('Invalid Cart', 'Your cart is empty.');
         return;
       }
+
+      console.log("[Checkout] Validation passed. Method:", paymentMethod);
 
       if (paymentMethod === 'online') {
         router.push({
@@ -73,39 +95,45 @@ export default function CartScreen() {
             contact: user.user_metadata?.phone || '',
           }
         });
-        setLoading(false);
-        return;
       } else {
-        processOrder(user.id, 'COD_PENDING');
+        await processOrder(user.id, 'COD_PENDING', effectiveAddress);
       }
-    } catch (err) {
-      console.error("Checkout error:", err);
-      Alert.alert("Error", "Something went wrong during checkout.");
+    } catch (err: any) {
+      console.error("[Checkout] Critical error:", err.message);
+      toastRef.current?.show("Something went wrong. Please try again.", 'error');
+    } finally {
       setLoading(false);
     }
   };
 
-  const processOrder = async (userId: string, paymentId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const userAddress = selectedAddress?.formattedAddress || user?.user_metadata?.permanent_address || 'Default Address, Hyderabad';
-    
-    const orderId = await placeOrder(userId, userAddress, paymentMethod);
-    
-    if (orderId) {
-      setLastOrder({
-        id: orderId,
-        items: [...items],
-        total: getTotal(),
-        date: new Date().toLocaleString(),
-        paymentId,
-        paymentMethod: paymentMethod === 'online' ? 'Online (UPI)' : 'Cash on Delivery',
-        address: userAddress
-      });
+  const processOrder = async (userId: string, paymentId: string, addressOverride?: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const finalAddress = addressOverride || selectedAddress?.formattedAddress || user?.user_metadata?.permanent_address || 'Default Address, Hyderabad';
+      
+      console.log("[Checkout] Processing order for user:", userId, "Address:", finalAddress);
+      
+      const orderId = await placeOrder(userId, finalAddress, paymentMethod);
+      
+      if (orderId) {
+        setLastOrder({
+          id: orderId,
+          items: [...items],
+          total: getTotal(),
+          date: new Date().toLocaleString(),
+          paymentId,
+          paymentMethod: paymentMethod === 'online' ? 'Online (UPI)' : 'Cash on Delivery',
+          address: finalAddress
+        });
+        setShowReceipt(true);
+      } else {
+        Alert.alert('Order Failed', 'We couldn\'t save your order. Please check your connection.');
+      }
+    } catch (err: any) {
+      console.error("[Checkout] processOrder error:", err.message);
+      Alert.alert('Error', 'An unexpected error occurred while placing your order.');
+    } finally {
       setLoading(false);
-      setShowReceipt(true);
-    } else {
-      setLoading(false);
-      Alert.alert('Error', 'Failed to place order. Please try again.');
     }
   };
 
@@ -196,19 +224,13 @@ export default function CartScreen() {
 
   if (items.length === 0 && !showReceipt) {
     return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconContainer}>
-          <ShoppingBag size={64} color="#F5A623" />
-        </View>
-        <Text style={styles.emptyTitle}>Your cart is empty</Text>
-        <Text style={styles.emptySubtitle}>Looks like you haven't added anything to your cart yet.</Text>
-        <TouchableOpacity 
-          style={styles.browseButton} 
-          onPress={() => router.replace('/(tabs)')}
-        >
-          <Text style={styles.browseButtonText}>Browse Products</Text>
-        </TouchableOpacity>
-      </View>
+      <EmptyState 
+        icon={ShoppingBag}
+        title="Your cart is feeling light"
+        subtitle="Looks like you haven't added any fresh harvest yet. Start your journey to health today!"
+        actionLabel="Start Shopping"
+        onAction={() => router.replace('/(tabs)')}
+      />
     );
   }
 
@@ -229,7 +251,7 @@ export default function CartScreen() {
                   {item.category === 'juice' ? `${item.variantName === 'very_pure' ? 'Very Pure' : 'Normal'} • 300ml` : `Fresh • Per kg`}
                 </Text>
                 <View style={styles.itemFooter}>
-                  <Text style={styles.itemPrice}>₹{item.subtotal.toFixed(2)}</Text>
+                  <Text style={styles.itemPrice}>{ProductService.formatPrice(item.subtotal)}</Text>
                   <View style={styles.quantityControl}>
                     <TouchableOpacity 
                       style={styles.qtyBtn} 
@@ -259,8 +281,8 @@ export default function CartScreen() {
         <View style={styles.addressSection}>
           <Text style={styles.sectionTitle}>Delivery Location</Text>
           <AddressPicker 
-            onAddressSelect={(addr) => setSelectedAddress(addr)}
-            initialAddress={{ formattedAddress: lastOrder?.address }}
+            onAddressSelect={handleAddressSelect}
+            initialAddress={selectedAddress || { formattedAddress: lastOrder?.address }}
           />
         </View>
 
@@ -299,7 +321,7 @@ export default function CartScreen() {
           <Text style={styles.summaryTitle}>Order Summary</Text>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>₹{getTotal().toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>{ProductService.formatPrice(getTotal())}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Delivery Fee</Text>
@@ -307,7 +329,7 @@ export default function CartScreen() {
           </View>
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>₹{getTotal().toFixed(2)}</Text>
+            <Text style={styles.totalValue}>{ProductService.formatPrice(getTotal())}</Text>
           </View>
         </View>
       </ScrollView>
@@ -319,7 +341,7 @@ export default function CartScreen() {
           disabled={loading}
         >
           <Text style={styles.checkoutBtnText}>
-            {loading ? 'Processing...' : `Proceed to Pay ₹${getTotal()}`}
+            {loading ? 'Processing...' : `Proceed to Pay ${ProductService.formatPrice(getTotal())}`}
           </Text>
           {!loading && <ChevronRight size={20} color="#FFFFFF" />}
         </TouchableOpacity>

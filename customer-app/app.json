@@ -22,7 +22,9 @@
       "package": "com.preetham.juiceshop",
       "versionCode": 3,
       "permissions": [
-        "INTERNET"
+        "INTERNET",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -52,6 +54,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-location",
       [
         "expo-build-properties",
         {

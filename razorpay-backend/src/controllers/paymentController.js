@@ -40,11 +40,16 @@ exports.createOrder = async (req, res) => {
       currency: order.currency,
     });
   } catch (error) {
-    console.error('RAZORPAY_ORDER_ERROR:', error);
+    console.error('RAZORPAY_ORDER_ERROR_DETAILS:', {
+      message: error.message,
+      code: error.code,
+      description: error.description,
+      amount: req.body.amount
+    });
     res.status(500).json({
       success: false,
-      message: 'Internal Server Error',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      message: 'Payment Gateway Error',
+      error: error.message, // Temporarily show error message for production debugging
     });
   }
 };
@@ -128,12 +133,14 @@ exports.renderCheckout = (req, res) => {
             "currency": "INR",
             "name": "${name || 'JuicyApp'}",
             "description": "Payment for order ${orderId}",
+            "image": "https://img.icons8.com/color/96/000000/juice.png",
             "order_id": "${orderId}",
+            "retry": {
+              "enabled": true,
+              "max_count": 3
+            },
             "handler": function (response) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                status: 'success',
-                data: response
-              }));
+              sendToApp('success', response);
             },
             "prefill": {
               "name": "${name || ''}",
@@ -145,29 +152,38 @@ exports.renderCheckout = (req, res) => {
             },
             "modal": {
               "ondismiss": function() {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  status: 'cancelled'
-                }));
+                sendToApp('cancelled');
               }
             }
           };
           
+          function sendToApp(status, data) {
+            const message = JSON.stringify({ status, data });
+            
+            // 1. Mobile App Bridge (Native)
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(message);
+            } 
+            
+            // 2. Web/Browser Bridge (Iframe)
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage(message, "*");
+            }
+            
+            // 3. Fallback for debugging
+            console.log("[PaymentBridge]", status, data);
+          }
+
           try {
             const rzp = new Razorpay(options);
             rzp.on('payment.failed', function (response){
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                status: 'failure',
-                data: response.error
-              }));
+              sendToApp('failure', response.error);
             });
             window.onload = function() {
-              setTimeout(() => rzp.open(), 500); // small delay to ensure rendering
+              setTimeout(() => rzp.open(), 500);
             };
           } catch(e) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              status: 'failure',
-              data: { description: 'Failed to load Razorpay SDK' }
-            }));
+            sendToApp('failure', { description: 'Failed to load Razorpay SDK' });
           }
         </script>
       </body>

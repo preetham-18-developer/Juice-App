@@ -50,8 +50,8 @@ export default function LoginScreen() {
               .eq('id', user.id)
               .maybeSingle();
             
-            // Bulletproof check for admin
-            const userRole = data?.role || (user.email === 'preethamgoud2006@gmail.com' ? 'admin' : 'user');
+            // Professional DB-driven role check
+            const userRole = data?.role || 'user';
             
             if (userRole === 'admin') {
               console.log("[Auth] Admin login success. Redirecting to /admin");

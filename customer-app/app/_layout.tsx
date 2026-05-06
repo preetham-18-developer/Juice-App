@@ -153,6 +153,7 @@ export default function RootLayout() {
               <Stack.Screen name="signup" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="admin" options={{ headerShown: false }} />
+              <Stack.Screen name="payment" options={{ title: 'Secure Payment' }} />
               <Stack.Screen name="product/[id]" options={{ title: 'Fresh Pick' }} />
               <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
               <Stack.Screen name="orders/[id]" options={{ title: 'Order Details' }} />

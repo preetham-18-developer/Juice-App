@@ -18,6 +18,7 @@ import { supabase } from '../../lib/supabase';
 import { Product, JuiceVariant } from '../../src/types';
 import { ChevronLeft, ShoppingBag, Plus, Minus, ShieldCheck, Clock, Star, Info, Leaf } from 'lucide-react-native';
 import { useCartStore } from '../../src/store/useCartStore';
+import { ProductService } from '../../src/services/ProductService';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -95,9 +96,7 @@ export default function ProductDetail() {
   }
 
   const isJuice = product.category === 'juice';
-  const currentPrice = isJuice 
-    ? (selectedVariant?.price || 0) 
-    : (product.price_per_kg || product.price || 0) * weight;
+  const currentPrice = ProductService.getPrice(product, isJuice ? selectedVariant! : undefined) * (isJuice ? 1 : weight);
 
   return (
     <View style={styles.container}>
@@ -190,7 +189,7 @@ export default function ProductDetail() {
                       styles.variantPrice,
                       selectedVariant?.id === v.id && styles.selectedVariantText
                     ]}>
-                      ₹{v.price}
+                      {ProductService.formatPrice(v.price)}
                     </Text>
                     <Text style={[
                       styles.variantSize,
@@ -223,7 +222,7 @@ export default function ProductDetail() {
                   <Plus size={22} color="#1e293b" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.priceHint}>Approx ₹{product.price_per_kg} per kg</Text>
+              <Text style={styles.priceHint}>Approx {ProductService.formatPrice(product.price_per_kg || 0)} per kg</Text>
             </View>
           )}
 
@@ -234,7 +233,7 @@ export default function ProductDetail() {
       <View style={styles.footer}>
         <View>
           <Text style={styles.totalLabel}>Grand Total</Text>
-          <Text style={styles.totalPrice}>₹{currentPrice.toFixed(2)}</Text>
+          <Text style={styles.totalPrice}>{ProductService.formatPrice(currentPrice)}</Text>
         </View>
         <TouchableOpacity activeOpacity={0.9} style={styles.cartButtonContainer} onPress={handleAddToCart}>
           <Animated.View style={[styles.cartButton, animatedCartStyle]}>

@@ -305,7 +305,9 @@ export default function OrderManagement() {
       )
       .subscribe();
 
-    return () => { channel.unsubscribe(); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
 

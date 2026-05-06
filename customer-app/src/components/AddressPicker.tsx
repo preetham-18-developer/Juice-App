@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import AddressMap from './AddressMap';
 import { 
   MapPin, 
   Navigation, 
@@ -67,7 +67,6 @@ export default function AddressPicker({ onAddressSelect, initialAddress }: Addre
   const handleManualChange = (field: keyof AddressData, value: string | number) => {
     setAddress(prev => {
       const next = { ...prev, [field]: value };
-      // Update formatted address on field changes
       if (field !== 'formattedAddress') {
         const parts = [next.street, next.locality, next.city, next.state, next.postalCode, next.country].filter(Boolean);
         next.formattedAddress = parts.join(', ');
@@ -76,30 +75,61 @@ export default function AddressPicker({ onAddressSelect, initialAddress }: Addre
     });
   };
 
+  // Sync with parent whenever the address object changes (Manual or Auto)
+  useEffect(() => {
+    if (address.formattedAddress && address.formattedAddress !== initialAddress?.formattedAddress) {
+      onAddressSelect(address);
+    }
+  }, [address.formattedAddress, onAddressSelect]);
+
   const fetchAddressFromCoords = async (latitude: number, longitude: number) => {
     try {
-      const results = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (results && results.length > 0) {
-        const res = results[0];
+      setLoading(true);
+      console.log(`[AddressPicker] Reverse geocoding: ${latitude}, ${longitude}`);
+      
+      const response = await Location.reverseGeocodeAsync({ latitude, longitude });
+      
+      if (response && response.length > 0) {
+        const result = response[0];
+        console.log("[AddressPicker] Geocoding result:", result);
+        
         const newAddress: AddressData = {
-          street: res.name || res.street || '',
-          locality: res.district || res.subregion || '',
-          city: res.city || '',
-          state: res.region || '',
-          postalCode: res.postalCode || '',
-          country: res.country || '',
-          formattedAddress: [res.name, res.district, res.city, res.region, res.postalCode, res.country].filter(Boolean).join(', '),
+          street: result.street || result.name || '',
+          locality: result.district || result.subregion || '',
+          city: result.city || '',
+          state: result.region || '',
+          postalCode: result.postalCode || '',
+          country: result.country || '',
+          formattedAddress: '',
           latitude,
           longitude,
         };
+
+        // Construct human-readable string
+        const parts = [
+          newAddress.street,
+          newAddress.locality,
+          newAddress.city,
+          newAddress.state,
+          newAddress.postalCode
+        ].filter(p => p && p.trim() !== '');
+        
+        newAddress.formattedAddress = parts.join(', ');
+        
         setAddress(newAddress);
         setSuccess(true);
         onAddressSelect(newAddress);
         setTimeout(() => setSuccess(false), 3000);
+      } else {
+        console.warn("[AddressPicker] No address found for these coordinates. Switching to manual.");
+        setIsManual(true);
+        Alert.alert("Location Not Found", "We couldn't resolve your GPS to an address. Please enter it manually.");
       }
-    } catch (err) {
-      setError('Geocoding failed. Please enter address manually.');
+    } catch (error: any) {
+      console.error("[AddressPicker] Geocoding API Error:", error.message);
+      setError('Address service unavailable. Please enter manually.');
       setIsManual(true);
+      Alert.alert("Service Unavailable", "The automatic address lookup service failed. Please enter your address manually.");
     }
   };
 
@@ -149,29 +179,11 @@ export default function AddressPicker({ onAddressSelect, initialAddress }: Addre
     <View style={styles.container}>
       {/* Map Preview */}
       {location && !isManual && (
-        <View style={styles.mapContainer}>
-          <MapView
-            style={styles.map}
-            provider={PROVIDER_GOOGLE}
-            region={{
-              latitude: location.latitude,
-              longitude: location.longitude,
-              latitudeDelta: 0.005,
-              longitudeDelta: 0.005,
-            }}
-            scrollEnabled={false}
-            zoomEnabled={false}
-          >
-            <Marker coordinate={location}>
-              <View style={styles.markerContainer}>
-                <View style={styles.markerCircle} />
-              </View>
-            </Marker>
-          </MapView>
-          <TouchableOpacity style={styles.refreshBtn} onPress={handleAllowLocation}>
-            <RefreshCcw size={16} color={COLORS.white} />
-          </TouchableOpacity>
-        </View>
+        <AddressMap 
+          location={location} 
+          addressName={address.formattedAddress}
+          onRefresh={handleAllowLocation} 
+        />
       )}
 
       {/* Main UI */}
@@ -299,38 +311,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     marginVertical: SPACING.md,
-  },
-  mapContainer: {
-    height: 150,
-    width: '100%',
-    position: 'relative',
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  markerContainer: {
-    padding: 10,
-  },
-  markerCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: COLORS.primaryGreen,
-    borderWidth: 3,
-    borderColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  refreshBtn: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 8,
-    borderRadius: 20,
   },
   content: {
     padding: SPACING.md,
