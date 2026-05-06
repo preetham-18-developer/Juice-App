@@ -22,6 +22,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
 import { Toast, ToastHandle } from '../../src/components/ui/Toast';
+import AddressPicker, { AddressData } from '../../src/components/AddressPicker';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +34,7 @@ export default function CartScreen() {
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
   const toastRef = React.useRef<ToastHandle>(null);
 
   const handleCheckout = async () => {
@@ -44,6 +46,12 @@ export default function CartScreen() {
         Alert.alert('Login Required', 'Please login to place an order', [
           { text: 'Login', onPress: () => router.push('/login') }
         ]);
+        setLoading(false);
+        return;
+      }
+
+      if (!selectedAddress && !user.user_metadata?.permanent_address) {
+        Alert.alert('Address Required', 'Please select or enter a delivery address');
         setLoading(false);
         return;
       }
@@ -79,7 +87,7 @@ export default function CartScreen() {
 
   const processOrder = async (userId: string, paymentId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const userAddress = user?.user_metadata?.permanent_address || 'Default Address, Hyderabad';
+    const userAddress = selectedAddress?.formattedAddress || user?.user_metadata?.permanent_address || 'Default Address, Hyderabad';
     
     const orderId = await placeOrder(userId, userAddress, paymentMethod);
     
@@ -246,6 +254,14 @@ export default function CartScreen() {
               </TouchableOpacity>
             </View>
           ))}
+        </View>
+
+        <View style={styles.addressSection}>
+          <Text style={styles.sectionTitle}>Delivery Location</Text>
+          <AddressPicker 
+            onAddressSelect={(addr) => setSelectedAddress(addr)}
+            initialAddress={{ formattedAddress: lastOrder?.address }}
+          />
         </View>
 
         <View style={styles.paymentSection}>
@@ -449,4 +465,8 @@ const styles = StyleSheet.create({
   receiptActionText: { marginLeft: 8, fontSize: 14, fontWeight: '600', color: '#64748b' },
   doneBtn: { backgroundColor: '#1e293b', paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
   doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  addressSection: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
 });

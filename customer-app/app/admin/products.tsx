@@ -9,8 +9,10 @@ import {
   Modal, 
   TextInput, 
   ScrollView,
+  useWindowDimensions,
+  Alert,
   ActivityIndicator,
-  Alert
+  Platform
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../src/theme/tokens';
 import { supabase } from '../../lib/supabase';
@@ -45,10 +47,38 @@ export default function ProductManagement() {
 
     if (!result.canceled) {
       setImageUrl(result.assets[0].uri);
-      // In a real app, you'd upload this to Supabase Storage here
-      // For now, we'll use the local URI or a placeholder for the DB
-      // since the DB expects a public URL. 
-      // I'll set a placeholder if it's a local file but show the local file in the UI.
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    try {
+      setUploading(true);
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}.${ext}`;
+      const filePath = `${fileName}`;
+
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const { error } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, blob, { 
+          contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      throw new Error("Failed to upload image: " + err.message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -114,9 +144,14 @@ export default function ProductManagement() {
     }
 
     try {
-      const finalImageUrl = imageUrl.startsWith('http') 
-        ? imageUrl 
-        : 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&q=80&w=400';
+      let finalImageUrl = imageUrl;
+      
+      // If image is a local URI (from ImagePicker), upload it
+      if (imageUrl && !imageUrl.startsWith('http')) {
+        finalImageUrl = await uploadImage(imageUrl);
+      } else if (!imageUrl) {
+        finalImageUrl = 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&q=80&w=400';
+      }
 
       const productData = {
         name,
@@ -278,12 +313,28 @@ export default function ProductManagement() {
     }
   };
 
+  const { width: rnWidth } = useWindowDimensions();
+  const [width, setWidth] = useState(Platform.OS === 'web' ? window.innerWidth : rnWidth);
+  const isLarge = width > 768;
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleResize = () => setWidth(window.innerWidth);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (rnWidth > 0) setWidth(rnWidth);
+  }, [rnWidth]);
+
   const renderProductItem = ({ item }: { item: any }) => (
-    <View style={styles.productCard}>
+    <View style={[styles.productCard, isLarge && styles.productCardLarge]}>
       <View style={styles.productMainRow}>
         <Image source={{ uri: item.image_url }} style={styles.productImage} />
         <View style={styles.productInfo}>
-          <Text style={styles.productName}>{item.name}</Text>
+          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.productCategory}>{item.category.toUpperCase()}</Text>
           <View style={styles.priceRow}>
             <Text style={styles.productPrice}>₹{item.price_per_kg || 60}</Text>
@@ -292,16 +343,16 @@ export default function ProductManagement() {
               !item.is_available && { color: '#FF5252', fontWeight: 'bold' },
               item.stock_kg < 2 && item.is_available && { color: '#F59E0B', fontWeight: 'bold' }
             ]}>
-              {item.is_available ? `${item.stock_kg} kg` : 'NOT AVAILABLE'}
+              {item.is_available ? `${item.stock_kg} kg` : 'OUT'}
             </Text>
           </View>
         </View>
         <View style={styles.actions}>
           <TouchableOpacity style={styles.actionBtn} onPress={() => openModal(item)}>
-            <Edit2 size={18} color={COLORS.primaryGreen} />
+            <Edit2 size={16} color={COLORS.primaryGreen} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item.id)}>
-            <Trash2 size={18} color="#FF5252" />
+            <Trash2 size={16} color="#FF5252" />
           </TouchableOpacity>
         </View>
       </View>
@@ -317,30 +368,30 @@ export default function ProductManagement() {
           style={[styles.statusToggle, !item.is_available && styles.statusToggleActiveErr]} 
           onPress={() => updateProductStatus(item, 'unavailable')}
         >
-          <Text style={[styles.statusToggleText, !item.is_available && styles.statusToggleTextActive]}>Not Available</Text>
+          <Text style={[styles.statusToggleText, !item.is_available && styles.statusToggleTextActive]}>Out</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.statusToggle, item.is_available && item.stock_kg < 5 && styles.statusToggleActiveWarn]} 
           onPress={() => updateProductStatus(item, 'low')}
         >
-          <Text style={[styles.statusToggleText, item.is_available && item.stock_kg < 5 && styles.statusToggleTextActive]}>Very Less</Text>
+          <Text style={[styles.statusToggleText, item.is_available && item.stock_kg < 5 && styles.statusToggleTextActive]}>Low</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Catalog</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+    <View style={[styles.container, isLarge && styles.containerLarge]}>
+      <View style={[styles.header, isLarge && styles.headerLarge]}>
+        <Text style={[styles.title, isLarge && { fontSize: 24 }]}>Catalog Management</Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
           <TouchableOpacity style={[styles.addBtn, { backgroundColor: COLORS.mutedGray }]} onPress={handleBulkImport}>
             <Upload size={18} color={COLORS.white} />
-            <Text style={styles.addBtnText}>CSV</Text>
+            <Text style={styles.addBtnText}>Bulk Import (CSV)</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addBtn} onPress={() => openModal()}>
             <Plus size={18} color={COLORS.white} />
-            <Text style={styles.addBtnText}>Add</Text>
+            <Text style={styles.addBtnText}>Add Product</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -349,10 +400,13 @@ export default function ProductManagement() {
         <ActivityIndicator style={{ marginTop: 50 }} color={COLORS.primaryGreen} />
       ) : (
         <FlatList
+          key={isLarge ? 'grid' : 'list'}
           data={products}
           renderItem={renderProductItem}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, isLarge && styles.listLarge]}
+          numColumns={isLarge ? 3 : 1}
+          columnWrapperStyle={isLarge ? { gap: 20 } : null}
         />
       )}
 
@@ -457,8 +511,16 @@ export default function ProductManagement() {
                 </TouchableOpacity>
               </View>
               
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>Save Product</Text>
+              <TouchableOpacity 
+                style={[styles.saveBtn, uploading && { opacity: 0.7 }]} 
+                onPress={handleSave}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save Product</Text>
+                )}
               </TouchableOpacity>
               <View style={{ height: 40 }} />
             </ScrollView>
@@ -474,12 +536,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  containerLarge: {
+    backgroundColor: '#F8FAFC',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
     backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  headerLarge: {
+    padding: 40,
+    paddingBottom: 20,
   },
   title: {
     fontSize: 18,
@@ -490,19 +561,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.primaryGreen,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    gap: 8,
   },
   addBtnText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   list: {
     padding: 16,
     paddingBottom: 40,
+  },
+  listLarge: {
+    padding: 40,
+    paddingTop: 0,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
   },
   productCard: {
     backgroundColor: COLORS.white,
@@ -513,6 +591,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 10,
     elevation: 2,
+  },
+  productCardLarge: {
+    flex: 1,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   productMainRow: {
     flexDirection: 'row',

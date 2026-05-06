@@ -5,7 +5,7 @@ const child = spawn('npx', ['eas-cli', 'login'], {
   shell: true
 });
 
-child.stdin.write('Emm2\n');
+child.stdin.write('Love1\n');
 setTimeout(() => {
   child.stdin.write('Preetham-18\n');
   child.stdin.end();

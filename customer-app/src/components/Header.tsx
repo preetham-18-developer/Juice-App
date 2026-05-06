@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
-import { COLORS, SPACING } from '../theme/tokens';
+import { COLORS, SPACING, SHADOWS, RADIUS } from '../theme/tokens';
 import { JuicyLogo } from './JuicyLogo';
 import { ShoppingCart, Bell } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useCartStore } from '../store/useCartStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
+import { ImpactFeedbackStyle } from 'expo-haptics';
 
 export const Header = () => {
   const router = useRouter();
@@ -14,69 +17,80 @@ export const Header = () => {
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const insets = useSafeAreaInsets();
 
-  return (
-    <LinearGradient
-      colors={['#FFF7E6', '#FFE0B2']}
-      style={[styles.container, { paddingTop: Math.max(insets.top, SPACING.sm) }]}
-    >
-      <TouchableOpacity 
-        style={styles.logoWrapper}
-        onPress={() => router.replace('/(tabs)')}
-      >
-        <JuicyLogo size={42} withText={false} />
-      </TouchableOpacity>
-      
-      <Text style={styles.logoText}>JuicyApp</Text>
+  const handleIconPress = (route: string) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(ImpactFeedbackStyle.Light);
+    }
+    router.push(route as any);
+  };
 
-      <View style={styles.rightIcons}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/notifications')}>
-          <Bell size={24} color={COLORS.darkText} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/(tabs)/cart')}>
-          <ShoppingCart size={24} color={COLORS.darkText} />
-          {cartCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{cartCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-    </LinearGradient>
+  return (
+    <View style={[styles.outerContainer, { paddingTop: Math.max(insets.top, SPACING.xs) }]}>
+      <BlurView intensity={80} tint="light" style={styles.blurContainer}>
+        <LinearGradient
+          colors={['rgba(255,247,230,0.8)', 'rgba(255,255,255,0.9)']}
+          style={styles.gradient}
+        >
+          <TouchableOpacity 
+            style={styles.logoWrapper}
+            onPress={() => router.replace('/(tabs)')}
+          >
+            <JuicyLogo size={38} withText={false} />
+          </TouchableOpacity>
+          
+          <Text style={styles.logoText}>Juicy<Text style={{ color: COLORS.primaryOrange }}>App</Text></Text>
+
+          <View style={styles.rightIcons}>
+            <TouchableOpacity 
+              style={styles.iconButton} 
+              onPress={() => handleIconPress('/notifications')}
+            >
+              <Bell size={22} color={COLORS.darkText} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.iconButton} 
+              onPress={() => handleIconPress('/(tabs)/cart')}
+            >
+              <ShoppingCart size={22} color={COLORS.darkText} />
+              {cartCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{cartCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </BlurView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  outerContainer: {
+    backgroundColor: COLORS.creamBackground,
+    zIndex: 100,
+  },
+  blurContainer: {
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+    ...SHADOWS.md,
+  },
+  gradient: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.md,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    paddingVertical: SPACING.sm,
   },
   logoWrapper: {
     backgroundColor: COLORS.white,
     padding: 2,
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 12,
+    ...SHADOWS.sm,
   },
   logoText: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: COLORS.primaryGreen,
     marginLeft: SPACING.sm,
@@ -86,29 +100,32 @@ const styles = StyleSheet.create({
   rightIcons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   iconButton: {
-    padding: 8,
-    marginLeft: SPACING.xs,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 12,
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   badge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: -4,
+    right: -4,
     backgroundColor: COLORS.primaryOrange,
-    width: 18,
+    minWidth: 18,
     height: 18,
     borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFE0B2',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    paddingHorizontal: 4,
   },
   badgeText: {
     color: COLORS.white,
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 9,
+    fontWeight: '900',
   },
 });

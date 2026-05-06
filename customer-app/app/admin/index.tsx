@@ -7,18 +7,37 @@ import {
   TouchableOpacity, 
   ActivityIndicator,
   Dimensions,
-  RefreshControl
+  RefreshControl,
+  Platform
 } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../src/theme/tokens';
 import { supabase } from '../../lib/supabase';
 import { TrendingUp, ShoppingBag, Package, Users, ArrowUpRight, ArrowDownRight, LogOut } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useWindowDimensions } from 'react-native';
 
-const { width } = Dimensions.get('window');
+const SimpleBarChart = ({ data, title }: { data: number[], title: string }) => {
+  const max = Math.max(...data);
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>{title}</Text>
+      <View style={styles.barContainer}>
+        {data.map((val, i) => (
+          <View key={i} style={styles.barWrapper}>
+            <View style={[styles.bar, { 
+              height: (val / max) * 100, 
+              backgroundColor: i === data.length - 1 ? COLORS.primaryGreen : COLORS.border 
+            }]} />
+            <Text style={styles.barLabel}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
 
-const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) => (
-  <View style={styles.statCard}>
+const StatCard = ({ title, value, change, isPositive, icon: Icon, color, isLarge }: any) => (
+  <View style={[styles.statCard, isLarge && styles.statCardLarge]}>
     <View style={styles.statHeader}>
       <View style={[styles.iconContainer, { backgroundColor: color + '15' }]}>
         <Icon size={20} color={color} />
@@ -28,35 +47,29 @@ const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) 
         <Text style={[styles.changeText, { color: isPositive ? '#2E7D32' : '#C62828' }]}>{change}%</Text>
       </View>
     </View>
-    <Text style={styles.statValue}>{value}</Text>
+    <Text style={[styles.statValue, isLarge && { fontSize: 28 }]}>{value}</Text>
     <Text style={styles.statLabel}>{title}</Text>
   </View>
 );
 
-const SimpleBarChart = ({ data, title }: { data: number[], title: string }) => {
-  const max = Math.max(...data, 1);
-  return (
-    <View style={styles.chartCard}>
-      <Text style={styles.chartTitle}>{title}</Text>
-      <View style={styles.barContainer}>
-        {data.map((val, i) => (
-          <View key={i} style={styles.barWrapper}>
-            <View 
-              style={[
-                styles.bar, 
-                { height: (val / max) * 100, backgroundColor: COLORS.primaryGreen }
-              ]} 
-            />
-            <Text style={styles.barLabel}>{['M','T','W','T','F','S','S'][i]}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-};
-
 export default function AnalyticsDashboard() {
   const router = useRouter();
+  const { width: rnWidth } = useWindowDimensions();
+  const [width, setWidth] = useState(Platform.OS === 'web' ? window.innerWidth : rnWidth);
+  const isLarge = width > 768;
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleResize = () => setWidth(window.innerWidth);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (rnWidth > 0) setWidth(rnWidth);
+  }, [rnWidth]);
+  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'today' | '7d' | '30d'>('today');
@@ -129,18 +142,21 @@ export default function AnalyticsDashboard() {
 
   return (
     <ScrollView 
-      style={styles.container}
+      style={[styles.container, isLarge && styles.containerLarge]}
+      contentContainerStyle={isLarge && styles.scrollContentLarge}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, isLarge && styles.headerLarge]}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.welcomeText}>Revenue Overview</Text>
             <Text style={styles.dateText}>{new Date().toDateString()}</Text>
           </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <LogOut size={20} color={COLORS.darkText} />
-          </TouchableOpacity>
+          {!isLarge && (
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <LogOut size={20} color={COLORS.darkText} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.filterContainer}>
@@ -158,7 +174,7 @@ export default function AnalyticsDashboard() {
         </View>
       </View>
 
-      <View style={styles.statsGrid}>
+      <View style={[styles.statsGrid, isLarge && styles.statsGridLarge]}>
         <StatCard 
           title={timeFilter === 'today' ? "Sales Today" : `Sales (${timeFilter})`}
           value={`₹${stats.filteredSales}`} 
@@ -166,6 +182,7 @@ export default function AnalyticsDashboard() {
           isPositive={true} 
           icon={TrendingUp} 
           color="#2E7D32" 
+          isLarge={isLarge}
         />
         <StatCard 
           title="Total Orders" 
@@ -174,6 +191,7 @@ export default function AnalyticsDashboard() {
           isPositive={true} 
           icon={ShoppingBag} 
           color="#0288D1" 
+          isLarge={isLarge}
         />
         <StatCard 
           title="Revenue Growth" 
@@ -182,6 +200,7 @@ export default function AnalyticsDashboard() {
           isPositive={true} 
           icon={TrendingUp} 
           color="#F57C00" 
+          isLarge={isLarge}
         />
         <StatCard 
           title="Total Users" 
@@ -190,27 +209,33 @@ export default function AnalyticsDashboard() {
           isPositive={true} 
           icon={Users} 
           color="#7B1FA2" 
+          isLarge={isLarge}
         />
       </View>
 
-      <SimpleBarChart data={stats.dailyData} title="Weekly Sales Trend" />
-
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Business Performance</Text>
-        <View style={styles.summaryRow}>
-          <View>
-            <Text style={styles.summaryLabel}>Avg. Order Value</Text>
-            <Text style={styles.summaryValue}>₹245.00</Text>
-          </View>
-          <View style={styles.divider} />
-          <View>
-            <Text style={styles.summaryLabel}>Conversion Rate</Text>
-            <Text style={styles.summaryValue}>3.4%</Text>
+      <View style={isLarge && styles.chartsSectionLarge}>
+        <View style={{ flex: 1.5 }}>
+          <SimpleBarChart data={stats.dailyData} title="Weekly Sales Trend" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={[styles.summaryCard, isLarge && { marginTop: SPACING.lg }]}>
+            <Text style={styles.summaryTitle}>Business Performance</Text>
+            <View style={styles.summaryRow}>
+              <View>
+                <Text style={styles.summaryLabel}>Avg. Order Value</Text>
+                <Text style={styles.summaryValue}>₹245.00</Text>
+              </View>
+              <View style={styles.divider} />
+              <View>
+                <Text style={styles.summaryLabel}>Conversion Rate</Text>
+                <Text style={styles.summaryValue}>3.4%</Text>
+              </View>
+            </View>
           </View>
         </View>
       </View>
 
-      <View style={{ height: 40 }} />
+      <View style={{ height: 60 }} />
     </ScrollView>
   );
 }
@@ -221,6 +246,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     padding: SPACING.md,
   },
+  containerLarge: {
+    padding: 40,
+  },
+  scrollContentLarge: {
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
+  },
   center: {
     flex: 1,
     justifyContent: 'center',
@@ -228,6 +261,9 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: SPACING.lg,
+  },
+  headerLarge: {
+    marginBottom: 40,
   },
   headerTop: {
     flexDirection: 'row',
@@ -280,8 +316,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: SPACING.md,
   },
+  statsGridLarge: {
+    gap: 24,
+  },
   statCard: {
-    width: (width - SPACING.md * 3) / 2,
+    width: (Dimensions.get('window').width - SPACING.md * 3) / 2,
     backgroundColor: COLORS.white,
     padding: 16,
     borderRadius: 24,
@@ -289,6 +328,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 10,
     elevation: 2,
+  },
+  statCardLarge: {
+    width: '23%',
+    padding: 24,
   },
   statHeader: {
     flexDirection: 'row',
@@ -325,6 +368,11 @@ const styles = StyleSheet.create({
     color: COLORS.mutedGray,
     marginTop: 2,
     fontWeight: '500',
+  },
+  chartsSectionLarge: {
+    flexDirection: 'row',
+    gap: 24,
+    alignItems: 'flex-start',
   },
   chartCard: {
     backgroundColor: COLORS.white,

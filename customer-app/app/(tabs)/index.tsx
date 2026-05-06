@@ -216,11 +216,13 @@ export default function HomeScreen() {
             </View>
           ) : filteredProducts.length > 0 ? (
             <Animated.View style={[styles.grid, { opacity: fadeAnim }]}>
-              {filteredProducts.map((item) => {
+              {filteredProducts.map((item, index) => {
                 const isJuice = item.category?.toLowerCase().includes('juice');
                 return isJuice ? (
                   <DestinationCard
                     key={item.id}
+                    id={item.id}
+                    index={index}
                     imageUrl={item.image_url || 'https://images.unsplash.com/photo-1622597467827-4309112bba21?w=400'}
                     category="Pure Juice"
                     title={item.name}
@@ -231,6 +233,8 @@ export default function HomeScreen() {
                 ) : (
                   <ProductCard
                     key={item.id}
+                    id={item.id}
+                    index={index}
                     name={item.name}
                     price={item.price_per_kg || item.price || 80}
                     image={item.image_url || 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400'}

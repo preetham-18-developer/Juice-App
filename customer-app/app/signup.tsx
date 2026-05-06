@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Toast, ToastHandle } from '../src/components/ui/Toast';
 import { Celebration } from '../src/components/ui/Celebration';
 import { COLORS } from '../src/theme/tokens';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInUp, ZoomIn } from 'react-native-reanimated';
 
 export default function SignupScreen() {
   const [name, setName] = useState('');
@@ -70,47 +70,73 @@ export default function SignupScreen() {
   if (signupDone) {
     return (
       <SafeAreaView style={styles.safeArea}>
+        <LinearGradient
+          colors={['#f0fdf4', '#ffffff']}
+          style={StyleSheet.absoluteFill}
+        />
         <Celebration />
+        
         <View style={styles.successContainer}>
-          <View style={styles.successIcon}>
-            <CheckCircle size={72} color="#10B981" />
-          </View>
-          <Text style={styles.successTitle}>Check Your Email!</Text>
-          <Text style={styles.successBody}>
-            We sent a verification link to{'\n'}
-            <Text style={styles.emailHighlight}>{email}</Text>
-          </Text>
-          <Text style={styles.successNote}>
-            Tap the link in the email to verify your account, then come back and sign in.
-          </Text>
-
-          <TouchableOpacity
-            style={styles.goLoginBtn}
-            onPress={() => router.replace('/login')}
+          <Animated.View 
+            entering={ZoomIn.duration(800).springify()}
+            style={styles.successIcon}
           >
-            <LinearGradient colors={['#10b981', '#059669']} style={styles.goLoginGradient}>
-              <Text style={styles.goLoginText}>Go to Sign In</Text>
-              <ArrowRight size={20} color="#fff" />
+            <LinearGradient
+              colors={[COLORS.primaryGreen, '#059669']}
+              style={styles.iconGradient}
+            >
+              <Mail size={48} color={COLORS.white} />
             </LinearGradient>
-          </TouchableOpacity>
+          </Animated.View>
 
-          <TouchableOpacity
-            style={styles.resendBtn}
-            onPress={async () => {
-              try {
-                const { error } = await supabase.auth.resend({
-                  type: 'signup',
-                  email: email.trim().toLowerCase(),
-                });
-                if (error) throw error;
-                Alert.alert('Sent!', 'Verification email resent. Please check your inbox.');
-              } catch (e: any) {
-                Alert.alert('Error', e.message);
-              }
-            }}
+          <Animated.View entering={FadeInUp.delay(400).springify()}>
+            <Text style={styles.successTitle}>Check Your Email!</Text>
+            
+            <View style={styles.contextCard}>
+              <Text style={styles.successBody}>
+                We sent a verification link to:
+              </Text>
+              <Text style={styles.emailHighlight}>{email}</Text>
+            </View>
+
+            <Text style={styles.successNote}>
+              Tap the link in the email to verify your account, then come back to start your fresh journey.
+            </Text>
+          </Animated.View>
+
+          <Animated.View 
+            entering={FadeInUp.delay(600).springify()}
+            style={styles.actionContainer}
           >
-            <Text style={styles.resendText}>Didn't receive it? Resend email</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={styles.goLoginBtn}
+              onPress={() => router.replace('/login')}
+            >
+              <LinearGradient colors={['#10b981', '#059669']} style={styles.goLoginGradient}>
+                <Text style={styles.goLoginText}>Go to Sign In</Text>
+                <ArrowRight size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.resendBtn}
+              onPress={async () => {
+                try {
+                  const { error } = await supabase.auth.resend({
+                    type: 'signup',
+                    email: email.trim().toLowerCase(),
+                  });
+                  if (error) throw error;
+                  toastRef.current?.show('Verification email resent!', 'success');
+                } catch (e: any) {
+                  toastRef.current?.show(e.message, 'error');
+                }
+              }}
+            >
+              <Text style={styles.resendText}>Didn't receive it? <Text style={{ textDecorationLine: 'underline' }}>Resend email</Text></Text>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
       </SafeAreaView>
     );
@@ -310,49 +336,75 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   successIcon: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#D1FAE5',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 32,
+    shadowColor: COLORS.primaryGreen,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  iconGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   successTitle: {
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: '900',
     color: '#1e293b',
-    marginBottom: 12,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  contextCard: {
+    backgroundColor: '#F8FAFC',
+    padding: 20,
+    borderRadius: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
   },
   successBody: {
-    fontSize: 16,
-    color: '#475569',
+    fontSize: 14,
+    color: '#64748b',
     textAlign: 'center',
-    lineHeight: 24,
+    marginBottom: 4,
   },
   emailHighlight: {
-    fontWeight: '700',
-    color: '#059669',
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.primaryGreen,
   },
   successNote: {
     fontSize: 14,
     color: '#94a3b8',
     textAlign: 'center',
     lineHeight: 22,
-    marginTop: 16,
-    marginBottom: 36,
+    marginBottom: 40,
     paddingHorizontal: 12,
+  },
+  actionContainer: {
+    width: '100%',
+    alignItems: 'center',
   },
   goLoginBtn: {
     width: '100%',
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
-    elevation: 6,
+    elevation: 8,
     shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 12,
-    marginBottom: 16,
+    shadowRadius: 15,
+    marginBottom: 20,
   },
   goLoginGradient: {
     flexDirection: 'row',
@@ -369,8 +421,7 @@ const styles = StyleSheet.create({
   resendBtn: { paddingVertical: 12 },
   resendText: {
     fontSize: 14,
-    color: '#059669',
+    color: COLORS.primaryGreen,
     fontWeight: '700',
-    textDecorationLine: 'underline',
   },
 });

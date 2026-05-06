@@ -59,3 +59,36 @@ export const TYPOGRAPHY = {
     color: COLORS.mutedGray,
   },
 };
+
+export const SHADOWS = {
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  lg: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+};
+
+export const ANIMATION = {
+  duration: {
+    fast: 200,
+    normal: 400,
+    slow: 800,
+  },
+  easing: [0.4, 0, 0.2, 1] as [number, number, number, number],
+};

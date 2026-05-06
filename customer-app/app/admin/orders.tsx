@@ -9,6 +9,8 @@ import {
   RefreshControl,
   Alert,
   Animated,
+  useWindowDimensions,
+  Platform
 } from 'react-native';
 import { COLORS, SPACING, RADIUS } from '../../src/theme/tokens';
 import { supabase } from '../../lib/supabase';
@@ -195,6 +197,23 @@ function OrderCard({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function OrderManagement() {
+
+  const { width: rnWidth } = useWindowDimensions();
+  const [width, setWidth] = useState(Platform.OS === 'web' ? window.innerWidth : rnWidth);
+  const isLarge = width > 768;
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleResize = () => setWidth(window.innerWidth);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (rnWidth > 0) setWidth(rnWidth);
+  }, [rnWidth]);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -289,36 +308,38 @@ export default function OrderManagement() {
     return () => { channel.unsubscribe(); };
   }, []);
 
-  // ── Derived data ───────────────────────────────────────────────────────────
+
+
   const filteredOrders = orders.filter(o => o.status === activeTab);
   const countFor = (s: OrderStatus) => orders.filter(o => o.status === s).length;
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isLarge && styles.containerLarge]}>
       {/* Tab bar */}
-      <View style={styles.tabBar}>
-        {TAB_STATUSES.map(status => {
-          const cfg = STATUS_CONFIG[status];
-          const isActive = activeTab === status;
-          const count = countFor(status);
-          return (
-            <TouchableOpacity
-              key={status}
-              style={[styles.tab, isActive && { backgroundColor: cfg.bg }]}
-              onPress={() => setActiveTab(status)}
-            >
-              <Text style={[styles.tabLabel, isActive && { color: cfg.color }]}>
-                {cfg.label}
-              </Text>
-              <View style={[styles.tabBadge, { backgroundColor: isActive ? cfg.color : COLORS.border }]}>
-                <Text style={[styles.tabBadgeText, { color: isActive ? '#fff' : COLORS.mutedGray }]}>
-                  {count}
+      <View style={[styles.tabBar, isLarge && styles.tabBarLarge]}>
+        <View style={isLarge ? styles.tabRowLarge : { flexDirection: 'row', flex: 1, gap: 6 }}>
+          {TAB_STATUSES.map(status => {
+            const cfg = STATUS_CONFIG[status];
+            const isActive = activeTab === status;
+            const count = countFor(status);
+            return (
+              <TouchableOpacity
+                key={status}
+                style={[styles.tab, isActive && { backgroundColor: cfg.bg }, isLarge && styles.tabLarge]}
+                onPress={() => setActiveTab(status)}
+              >
+                <Text style={[styles.tabLabel, isActive && { color: cfg.color }, isLarge && { fontSize: 13 }]}>
+                  {cfg.label}
                 </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+                <View style={[styles.tabBadge, { backgroundColor: isActive ? cfg.color : COLORS.border }]}>
+                  <Text style={[styles.tabBadgeText, { color: isActive ? '#fff' : COLORS.mutedGray }]}>
+                    {count}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       {/* List */}
@@ -328,9 +349,12 @@ export default function OrderManagement() {
         </View>
       ) : (
         <FlatList
+          key={isLarge ? 'grid' : 'list'}
           data={filteredOrders}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
+          numColumns={isLarge ? 2 : 1}
+          columnWrapperStyle={isLarge ? { gap: 24 } : null}
+          contentContainerStyle={[styles.listContent, isLarge && styles.listContentLarge]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -339,18 +363,20 @@ export default function OrderManagement() {
             />
           }
           renderItem={({ item }) => (
-            <OrderCard
-              item={item}
-              onUpdate={updateStatus}
-              isLoading={updatingIds.has(item.id)}
-            />
+            <View style={{ flex: 1 }}>
+              <OrderCard
+                item={item}
+                onUpdate={updateStatus}
+                isLoading={updatingIds.has(item.id)}
+              />
+            </View>
           )}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Package size={56} color={COLORS.border} />
+              <Package size={64} color={COLORS.border} />
               <Text style={styles.emptyTitle}>No orders here</Text>
               <Text style={styles.emptySubtitle}>
-                There are no "{STATUS_CONFIG[activeTab].label}" orders right now.
+                There are currently no "{STATUS_CONFIG[activeTab].label}" orders.
               </Text>
             </View>
           }
@@ -367,6 +393,7 @@ export default function OrderManagement() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
+  containerLarge: { backgroundColor: '#F8FAFC' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // Tab bar
@@ -379,12 +406,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  tabBarLarge: {
+    paddingHorizontal: 40,
+    paddingVertical: 16,
+  },
+  tabRowLarge: {
+    flexDirection: 'row',
+    gap: 12,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
+  },
   tab: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 8,
     borderRadius: 12,
     gap: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  tabLarge: {
+    flex: 0,
+    minWidth: 140,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
   },
   tabLabel: {
     fontSize: 10,
@@ -403,6 +451,12 @@ const styles = StyleSheet.create({
 
   // List
   listContent: { padding: 16, paddingBottom: 60 },
+  listContentLarge: {
+    padding: 40,
+    maxWidth: 1200,
+    alignSelf: 'center',
+    width: '100%',
+  },
 
   // Order card
   orderCard: {

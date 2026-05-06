@@ -22,7 +22,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../src/theme/tokens';
 import { Celebration } from '../src/components/ui/Celebration';
 import { Toast, ToastHandle } from '../src/components/ui/Toast';
-import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeIn, ZoomIn, FadeInUp } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
+import { CheckCircle } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -237,16 +239,27 @@ export default function LoginScreen() {
           entering={FadeIn}
           style={styles.successOverlay}
         >
+          <BlurView intensity={20} style={StyleSheet.absoluteFill} />
           <LinearGradient
             colors={[COLORS.primaryGreen, '#059669']}
             style={styles.successGradient}
           >
-            <Animated.View entering={ZoomIn.delay(200)} style={styles.successIconContainer}>
-              <Leaf color={COLORS.white} size={60} />
+            <Animated.View 
+              entering={ZoomIn.delay(200).springify()} 
+              style={styles.successIconContainer}
+            >
+              <View style={styles.glowEffect} />
+              <CheckCircle color={COLORS.white} size={60} />
             </Animated.View>
-            <Text style={styles.successTitle}>Welcome Back!</Text>
-            <Text style={styles.successSubtitle}>Preparing your fresh experience...</Text>
-            <ActivityIndicator color={COLORS.white} style={{ marginTop: 24 }} />
+            <Animated.View entering={FadeInUp.delay(400).springify()}>
+              <Text style={styles.successTitle}>Welcome Back!</Text>
+              <View style={styles.userBadge}>
+                <Mail size={14} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.successEmail}>{email}</Text>
+              </View>
+              <Text style={styles.successSubtitle}>Preparing your fresh experience...</Text>
+            </Animated.View>
+            <ActivityIndicator color={COLORS.white} style={{ marginTop: 32 }} />
           </LinearGradient>
         </Animated.View>
       )}
@@ -280,11 +293,37 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
+  userBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginTop: 12,
+    gap: 6,
+    alignSelf: 'center',
+  },
+  successEmail: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   successSubtitle: {
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  glowEffect: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    zIndex: -1,
   },
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   container: { flex: 1 },
