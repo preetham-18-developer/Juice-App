@@ -261,7 +261,7 @@ export default function PaymentScreen() {
         <script>
           const options = {
             "key": "${razorpayKeyId}",
-            "amount": "${Number(amount) * 100}",
+            "amount": "${Math.round(Number(amount) * 100)}",
             "currency": "INR",
             "name": "${name || 'JuicyApp'}",
             "description": "Payment for order ${orderId}",
