@@ -12,28 +12,11 @@ interface AddressMapProps {
 
 export default function AddressMap({ location, addressName, onRefresh }: AddressMapProps) {
   return (
-    <View style={styles.mapContainer}>
-      <MapView
-        style={styles.map}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-        region={{
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        }}
-        scrollEnabled={false}
-        zoomEnabled={false}
-      >
-        <Marker 
-          coordinate={location}
-          title={addressName || "Selected Location"}
-        >
-          <View style={styles.markerContainer}>
-            <View style={styles.markerCircle} />
-          </View>
-        </Marker>
-      </MapView>
+    <View style={[styles.mapContainer, { backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={styles.markerContainer}>
+        <View style={styles.markerCircle} />
+      </View>
+      <Text style={{ marginTop: 8, color: '#64748b', fontSize: 12 }}>Location Selected</Text>
       <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh}>
         <RefreshCcw size={16} color={COLORS.white} />
       </TouchableOpacity>

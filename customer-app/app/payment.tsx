@@ -246,7 +246,7 @@ export default function PaymentScreen() {
   const webViewRef = useRef<WebView>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const razorpayKeyId = process.env.EXPO_PUBLIC_RAZORPAY_KEY || '';
+  const razorpayKeyId = process.env.EXPO_PUBLIC_RAZORPAY_KEY || 'rzp_test_Shgn1PuPVEOaBC';
   
   const checkoutHtml = orderId ? `
     <!DOCTYPE html>
@@ -310,7 +310,7 @@ export default function PaymentScreen() {
         ) : (
           <WebView 
             ref={webViewRef}
-            source={{ html: checkoutHtml, baseUrl: 'https://checkout.razorpay.com' }} 
+            source={{ html: checkoutHtml, baseUrl: 'https://juice-app-9uzq.onrender.com' }} 
             onMessage={onMessage}
             originWhitelist={['*']}
             javaScriptEnabled={true}
