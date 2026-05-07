@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,15 +6,11 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Platform,
-  Linking,
-  ScrollView,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AddressMap from './AddressMap';
-import { LocationService, StructuredAddress } from '../services/LocationService';
+import { StructuredAddress } from '../services/LocationService';
+import { useLocation } from '../hooks/useLocation';
 import { 
   MapPin, 
   Navigation, 
@@ -22,10 +18,7 @@ import {
   CheckCircle, 
   AlertCircle, 
   ChevronRight, 
-  X,
   RefreshCcw,
-  Search,
-  Map as MapIcon
 } from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../theme/tokens';
 
@@ -37,9 +30,7 @@ interface AddressPickerProps {
 }
 
 export default function AddressPicker({ onAddressSelect, initialAddress }: AddressPickerProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const { loading, error, address: fetchedAddress, fetchLocation, openSettings } = useLocation();
   const [isManual, setIsManual] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -75,6 +66,20 @@ export default function AddressPicker({ onAddressSelect, initialAddress }: Addre
     });
   };
 
+  // Sync when hook successfully fetches an address
+  useEffect(() => {
+    if (fetchedAddress) {
+      setAddress(prev => ({
+        ...prev,
+        ...fetchedAddress,
+        landmark: prev.landmark // Preserve typed landmark
+      }));
+      setSuccess(true);
+      setIsManual(false);
+      setTimeout(() => setSuccess(false), 3000);
+    }
+  }, [fetchedAddress]);
+
   // Sync with parent whenever the address object changes
   useEffect(() => {
     if (address.formattedAddress) {
@@ -82,75 +87,18 @@ export default function AddressPicker({ onAddressSelect, initialAddress }: Addre
     }
   }, [address, onAddressSelect]);
 
-  const handleAllowLocation = async () => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-    
-    try {
-      // Phase 2: Professional Permission Handling
-      const hasPermission = await LocationService.requestPermissions();
-      if (!hasPermission) {
-        setError('Location permission is required for auto-detection.');
-        // Don't use Alert.alert on web/production if possible, but for permissions it's okay as a last resort
-        if (Platform.OS !== 'web') {
-          Alert.alert(
-            'Location Access Needed',
-            'Please enable location services in your device settings to use this feature.',
-            [{ text: 'Open Settings', onPress: () => Linking.openSettings() }, { text: 'OK' }]
-          );
-        }
-        return;
-      }
-
-      // Phase 3 & 5: Optimized Fetching with human-readable feedback
-      const coords = await LocationService.getCurrentCoords();
-      if (!coords) {
-        setError('GPS signal weak. Please ensure location is enabled.');
-        return;
-      }
-
-      setLocation(coords);
-      
-      // Phase 3: Reverse Geocoding with fallback
-      const structuredAddress = await LocationService.reverseGeocode(coords.latitude, coords.longitude);
-      
-      if (structuredAddress) {
-        setAddress(prev => ({
-          ...prev,
-          ...structuredAddress,
-          landmark: prev.landmark // Preserve landmark if already typed
-        }));
-        setSuccess(true);
-        setIsManual(false); // Switch out of manual if we found it
-        setTimeout(() => setSuccess(false), 3000);
-      } else {
-        setError('Could not identify address. Please enter manually.');
-        setIsManual(true);
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please enter address manually.');
-      setIsManual(true);
-    } finally {
-      setLoading(false);
-    }
+  const handleFetchClick = () => {
+    if (loading) return;
+    setIsManual(false);
+    fetchLocation();
   };
 
   return (
     <View style={styles.container}>
-      {/* Map Preview */}
-      {location && !isManual && (
-        <AddressMap 
-          location={location} 
-          addressName={address.formattedAddress}
-          onRefresh={handleAllowLocation} 
-        />
-      )}
-
       {/* Main UI */}
       <View style={styles.content}>
         {!address.formattedAddress && !isManual && !loading && (
-          <TouchableOpacity style={styles.allowBtn} onPress={handleAllowLocation}>
+          <TouchableOpacity style={styles.allowBtn} onPress={handleFetchClick}>
             <LinearGradient
               colors={[COLORS.primaryGreen, '#1b5e20']}
               style={styles.btnGradient}
