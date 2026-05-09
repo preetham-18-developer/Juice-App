@@ -25,6 +25,7 @@ import { Toast, ToastHandle } from '../src/components/ui/Toast';
 import Animated, { FadeIn, ZoomIn, FadeInUp } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { CheckCircle } from 'lucide-react-native';
+import { Balloons } from '../src/components/ui/balloons';
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +37,18 @@ export default function LoginScreen() {
   const segments = useSegments();
   const router = useRouter();
   const toastRef = React.useRef<ToastHandle>(null);
+  const balloonsRef = React.useRef<{ launchAnimation: () => void } | null>(null);
+
+  // Trigger balloons on success
+  useEffect(() => {
+    if (loginSuccess && Platform.OS === 'web') {
+      // Small delay to ensure component is mounted if needed, or trigger immediately
+      const timer = setTimeout(() => {
+        balloonsRef.current?.launchAnimation();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [loginSuccess]);
 
   // Redirect after success animation
   useEffect(() => {
@@ -261,6 +274,7 @@ export default function LoginScreen() {
             </Animated.View>
             <ActivityIndicator color={COLORS.white} style={{ marginTop: 32 }} />
           </LinearGradient>
+          <Balloons ref={balloonsRef} type="default" />
         </Animated.View>
       )}
     </SafeAreaView>

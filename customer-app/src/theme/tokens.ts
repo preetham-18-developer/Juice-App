@@ -1,94 +1,28 @@
+import { 
+  COLORS as NEW_COLORS, 
+  SPACING as NEW_SPACING, 
+  RADIUS as NEW_RADIUS,
+  SHADOWS as NEW_SHADOWS 
+} from './colors';
+import { TYPOGRAPHY as NEW_TYPOGRAPHY } from './typography';
+
+// Redirect old tokens to new luxury theme for stability
 export const COLORS = {
-  primaryOrange: '#FF7700',
-  primaryGreen: '#2E7D32',
-  creamBackground: '#FFF7E6',
+  ...NEW_COLORS,
   white: '#FFFFFF',
-  mutedGray: '#6B7280',
-  darkText: '#1F2937',
-  lightGray: '#F3F4F6',
-  border: '#E5E7EB',
-  error: '#EF4444',
-  success: '#10B981',
-};
-
-export const SPACING = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 40,
-};
-
-export const RADIUS = {
-  sm: 8,
-  md: 16,
-  lg: 20,
-  full: 999,
+  primaryGreen: '#2E7D32',
+  creamBackground: '#FDFCF0',
 };
 
 export const TYPOGRAPHY = {
-  h1: {
-    fontSize: 28,
-    fontWeight: '700' as const,
-    color: COLORS.darkText,
-  },
-  h2: {
-    fontSize: 22,
-    fontWeight: '700' as const,
-    color: COLORS.darkText,
-  },
-  h3: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    color: COLORS.darkText,
-  },
-  body: {
-    fontSize: 16,
-    fontWeight: '500' as const,
-    color: COLORS.darkText,
-  },
+  ...NEW_TYPOGRAPHY,
   subtext: {
+    fontFamily: 'Outfit_400Regular',
     fontSize: 14,
-    fontWeight: '500' as const,
-    color: COLORS.mutedGray,
-  },
-  caption: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: COLORS.mutedGray,
-  },
+    color: '#6B7280',
+  }
 };
 
-export const SHADOWS = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 15 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-};
-
-export const ANIMATION = {
-  duration: {
-    fast: 200,
-    normal: 400,
-    slow: 800,
-  },
-  easing: [0.4, 0, 0.2, 1] as [number, number, number, number],
-};
+export const SPACING = NEW_SPACING;
+export const RADIUS = NEW_RADIUS;
+export const SHADOWS = NEW_SHADOWS;

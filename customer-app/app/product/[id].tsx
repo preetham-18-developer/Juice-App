@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: width,
-    height: 420,
+    height: Dimensions.get('window').height * 0.45,
     backgroundColor: '#f8fafc',
   },
   mainImage: {

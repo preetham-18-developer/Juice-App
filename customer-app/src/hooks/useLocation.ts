@@ -51,14 +51,7 @@ export function useLocation(): UseLocationResult {
       if (structuredAddress) {
         setAddress(structuredAddress);
       } else {
-        // Fallback to purely coordinates
-        setAddress({
-          formattedAddress: `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`,
-          street: '', houseNumber: '', area: '', city: '', state: '', country: '', postalCode: '', landmark: '',
-          latitude: coords.latitude,
-          longitude: coords.longitude
-        });
-        setError('Geocoding failed. Using raw coordinates.');
+        setError('Could not automatically determine your address. Please enter it manually.');
       }
     } catch (err: any) {
       monitor.log('ERROR', 'useLocation', 'Fatal hook error', { err: err.message });

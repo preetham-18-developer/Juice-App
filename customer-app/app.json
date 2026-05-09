@@ -52,7 +52,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "pwa": {
+        "enabled": false
+      }
     },
     "plugins": [
       "expo-router",

@@ -8,24 +8,20 @@ import {
   Image, 
   SafeAreaView,
   Alert,
-  Modal,
   Dimensions,
   Platform,
-  ActivityIndicator
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useCartStore } from '../../src/store/useCartStore';
-import { Trash2, Plus, Minus, ChevronRight, ShoppingBag, CreditCard, Banknote, CheckCircle2, Download, Eye, X } from 'lucide-react-native';
+import { Trash2, Plus, Minus, ChevronRight, ShoppingBag, CreditCard, Banknote } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 
 import { Toast, ToastHandle } from '../../src/components/ui/Toast';
 import { ProductService } from '../../src/services/ProductService';
 import AddressPicker, { AddressData } from '../../src/components/AddressPicker';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { NotificationService } from '../../src/services/NotificationService';
+import { OrderTrackingService } from '../../src/services/orderTrackingService';
 
 const { width } = Dimensions.get('window');
 
@@ -33,23 +29,19 @@ export default function CartScreen() {
   const { items, removeItem, updateQuantity, getTotal, placeOrder, clearCart } = useCartStore();
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
-  const [showReceipt, setShowReceipt] = useState(false);
-  const [lastOrder, setLastOrder] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
   const toastRef = React.useRef<ToastHandle>(null);
 
   const handleAddressSelect = React.useCallback((addr: AddressData) => {
-    console.log("[Cart] Address selected:", addr.formattedAddress);
     setSelectedAddress(addr);
   }, []);
 
   const handleCheckout = async () => {
+    if (loading) return;
+    
     try {
       setLoading(true);
-      console.log("[Checkout] Initiating checkout process...");
-      
       const { data: { user }, error } = await supabase.auth.getUser();
       
       if (error || !user) {
@@ -59,35 +51,30 @@ export default function CartScreen() {
         return;
       }
 
-      // 1. Validate Address (with fallback formatting)
-      let effectiveAddress = selectedAddress?.formattedAddress;
-      
-      if (!effectiveAddress && selectedAddress) {
-        const parts = [selectedAddress.street, selectedAddress.area, selectedAddress.city].filter(Boolean);
-        effectiveAddress = parts.join(', ');
-      }
-
-      if (!effectiveAddress || effectiveAddress.trim().length < 5) {
-        toastRef.current?.show(
-          !selectedAddress ? "Please select a delivery address." : "Address is too short.", 
-          'error'
-        );
+      // 1. Strict Address Validation
+      if (!selectedAddress || !selectedAddress.formattedAddress) {
+        toastRef.current?.show("Please select or enter a delivery address.", 'error');
         setLoading(false);
         return;
       }
 
-      console.log("[Checkout] Validated Address:", effectiveAddress);
+      const { city, state, formattedAddress } = selectedAddress;
+      
+      if (!city?.trim() || !state?.trim() || formattedAddress.trim().length < 5) {
+        toastRef.current?.show("Incomplete address. Please provide area, city and state.", 'error');
+        setLoading(false);
+        return;
+      }
 
       const totalAmount = getTotal();
       if (totalAmount <= 0) {
         Alert.alert('Invalid Cart', 'Your cart is empty.');
+        setLoading(false);
         return;
       }
 
-      console.log("[Checkout] Validation passed. Method:", paymentMethod);
-
       if (paymentMethod === 'online') {
-        const orderId = await placeOrder(user.id, effectiveAddress, 'online', 'pending_payment', selectedAddress || undefined); 
+        const orderId = await placeOrder(user.id, formattedAddress, 'online', 'pending_payment', selectedAddress); 
         
         if (!orderId) {
           setLoading(false);
@@ -105,10 +92,9 @@ export default function CartScreen() {
           }
         });
       } else {
-        await processOrder(user.id, 'COD_PENDING', effectiveAddress);
+        await processOrder(user.id, 'COD_PENDING', formattedAddress);
       }
     } catch (err: any) {
-      console.error("[Checkout] Critical error:", err.message);
       toastRef.current?.show("Something went wrong. Please try again.", 'error');
     } finally {
       setLoading(false);
@@ -118,13 +104,15 @@ export default function CartScreen() {
   const processOrder = async (userId: string, paymentId: string, addressOverride?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const finalAddress = addressOverride || selectedAddress?.formattedAddress || user?.user_metadata?.permanent_address || 'Default Address, Hyderabad';
-      
-      console.log("[Checkout] Processing order for user:", userId, "Address:", finalAddress);
-      
-      const orderId = await placeOrder(userId, finalAddress, paymentMethod, 'received', selectedAddress || undefined);
-      
+      const finalAddress = addressOverride || selectedAddress?.formattedAddress || user?.user_metadata?.permanent_address || 'Default Address';
+
+      const orderId = await placeOrder(userId, finalAddress, paymentMethod, 'PENDING', selectedAddress || undefined);
+
       if (orderId) {
+        // 1. Initialize tracking immediately
+        await OrderTrackingService.initializeTracking(orderId);
+
+        // 2. Send WhatsApp notification (fire & forget)
         const orderPayload = {
           id: orderId,
           customerName: user?.user_metadata?.full_name || 'Valued Customer',
@@ -136,119 +124,33 @@ export default function CartScreen() {
           items: items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
           total: getTotal(),
           paymentType: paymentMethod,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         };
+        console.log('[Checkout] Dispatching notification for COD:', orderPayload.customerPhone);
+        NotificationService.sendOrderNotification(orderPayload).catch(e =>
+          console.warn('[Checkout] Notification failed silently:', e.message)
+        );
 
-        // Trigger Admin Notification
-        NotificationService.sendOrderNotification(orderPayload);
+        // 3. Clear cart
+        clearCart();
 
-        setLastOrder({
-          id: orderId,
-          items: [...items],
-          total: getTotal(),
-          date: new Date().toLocaleString(),
-          paymentId,
-          paymentMethod: paymentMethod === 'online' ? 'Online (UPI)' : 'Cash on Delivery',
-          address: finalAddress
-        });
-        setShowReceipt(true);
+        // 4. Navigate to live order tracking screen
+        toastRef.current?.show('Order placed! Tracking your delivery...', 'success');
+        setTimeout(() => {
+          router.replace(`/orders/${orderId}` as any);
+        }, 800);
       } else {
-        Alert.alert('Order Failed', 'We couldn\'t save your order. Please check your connection.');
+        setLoading(false);
+        Alert.alert('Order Failed', 'We couldn\'t save your order. Please try again.');
       }
     } catch (err: any) {
-      console.error("[Checkout] processOrder error:", err.message);
-      Alert.alert('Error', 'An unexpected error occurred while placing your order.');
-    } finally {
       setLoading(false);
+      console.error('[Checkout] processOrder error:', err.message);
+      Alert.alert('Error', 'An unexpected error occurred while placing your order.');
     }
   };
 
-  const generatePDF = async () => {
-    if (!lastOrder) return;
-    setDownloading(true);
-    try {
-      const html = `
-        <html>
-          <head>
-            <style>
-              body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; }
-              .header { text-align: center; border-bottom: 2px solid #FF7700; padding-bottom: 20px; }
-              .order-info { margin: 30px 0; display: flex; justify-content: space-between; }
-              .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              .table th { text-align: left; background-color: #f8fafc; padding: 12px; border-bottom: 1px solid #e2e8f0; }
-              .table td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
-              .total-section { margin-top: 30px; text-align: right; }
-              .footer { margin-top: 50px; text-align: center; color: #94a3b8; font-size: 12px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>Juice Shop Receipt</h1>
-              <p>Order #${lastOrder.id.slice(0, 8).toUpperCase()}</p>
-            </div>
-            <div class="order-info">
-              <div>
-                <strong>Date:</strong> ${lastOrder.date}<br>
-                <strong>Payment:</strong> ${lastOrder.paymentMethod}<br>
-                <strong>Transaction ID:</strong> ${lastOrder.paymentId}
-              </div>
-              <div>
-                <strong>Shipping Address:</strong><br>
-                ${lastOrder.address}
-              </div>
-            </div>
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Qty</th>
-                  <th>Price</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${lastOrder.items.map((item: any) => `
-                  <tr>
-                    <td>${item.name}</td>
-                    <td>${item.quantity}</td>
-                    <td>₹${item.price.toFixed(2)}</td>
-                    <td>₹${item.subtotal.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-            <div class="total-section">
-              <h3>Total Amount: ₹${lastOrder.total.toFixed(2)}</h3>
-            </div>
-            <div class="footer">
-              <p>Thank you for shopping with Juice Shop!</p>
-              <p>If you have any questions, contact us at support@juiceshop.com</p>
-            </div>
-          </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html });
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
-      } else {
-        Alert.alert('Success', 'PDF generated! (Sharing is only available on mobile)');
-      }
-    } catch (error) {
-      console.error('PDF Error:', error);
-      Alert.alert('Error', 'Failed to generate PDF');
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleReceiptClose = () => {
-    setShowReceipt(false);
-    clearCart();
-    router.replace('/(tabs)/orders');
-  };
-
-  if (items.length === 0 && !showReceipt) {
+  if (items.length === 0) {
     return (
       <EmptyState 
         icon={ShoppingBag}
@@ -308,7 +210,7 @@ export default function CartScreen() {
           <Text style={styles.sectionTitle}>Delivery Location</Text>
           <AddressPicker 
             onAddressSelect={handleAddressSelect}
-            initialAddress={selectedAddress || { formattedAddress: lastOrder?.address }}
+            initialAddress={selectedAddress || { formattedAddress: '' }}
           />
         </View>
 
@@ -372,79 +274,6 @@ export default function CartScreen() {
           {!loading && <ChevronRight size={20} color="#FFFFFF" />}
         </TouchableOpacity>
       </View>
-
-      <Modal
-        visible={showReceipt}
-        animationType="fade"
-        transparent={true}
-      >
-        <View style={styles.receiptOverlay}>
-          <View style={styles.receiptContainer}>
-            <LinearGradient
-              colors={['#4ADE80', '#22C55E']}
-              style={styles.receiptHeader}
-            >
-              <CheckCircle2 size={48} color="#FFFFFF" />
-              <Text style={styles.receiptStatus}>Payment Successful!</Text>
-              <Text style={styles.receiptId}>Order #{lastOrder?.id?.slice(0, 8).toUpperCase()}</Text>
-            </LinearGradient>
-
-            <ScrollView style={styles.receiptContent} showsVerticalScrollIndicator={false}>
-              <View style={styles.receiptSection}>
-                <Text style={styles.receiptLabel}>Transaction Details</Text>
-                <View style={styles.receiptRow}>
-                  <Text style={styles.receiptRowLabel}>Date</Text>
-                  <Text style={styles.receiptRowValue}>{lastOrder?.date}</Text>
-                </View>
-                <View style={styles.receiptRow}>
-                  <Text style={styles.receiptRowLabel}>Payment ID</Text>
-                  <Text style={styles.receiptRowValue}>{lastOrder?.paymentId?.slice(0, 15)}...</Text>
-                </View>
-                <View style={styles.receiptRow}>
-                  <Text style={styles.receiptRowLabel}>Method</Text>
-                  <Text style={styles.receiptRowValue}>{lastOrder?.paymentMethod}</Text>
-                </View>
-              </View>
-
-              <View style={styles.receiptSection}>
-                <Text style={styles.receiptLabel}>Items Purchased</Text>
-                {lastOrder?.items.map((item: any) => (
-                  <View key={item.id} style={styles.receiptItem}>
-                    <Text style={styles.receiptItemName}>{item.name} x {item.quantity}</Text>
-                    <Text style={styles.receiptItemPrice}>₹{item.subtotal.toFixed(2)}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.receiptTotal}>
-                <Text style={styles.receiptTotalLabel}>Total Amount Paid</Text>
-                <Text style={styles.receiptTotalValue}>₹{lastOrder?.total.toFixed(2)}</Text>
-              </View>
-            </ScrollView>
-
-            <View style={styles.receiptFooter}>
-              <View style={styles.receiptActions}>
-                <TouchableOpacity style={styles.receiptActionBtn} onPress={() => router.push(`/orders/${lastOrder?.id}`)}>
-                  <Eye size={20} color="#64748b" />
-                  <Text style={styles.receiptActionText}>View</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.receiptActionBtn, downloading && { opacity: 0.5 }]} 
-                  onPress={generatePDF}
-                  disabled={downloading}
-                >
-                  {downloading ? <ActivityIndicator size={20} color="#64748b" /> : <Download size={20} color="#64748b" />}
-                  <Text style={styles.receiptActionText}>Download</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity style={styles.doneBtn} onPress={handleReceiptClose}>
-                <Text style={styles.doneBtnText}>Back to Orders</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -452,12 +281,6 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   scroll: { flex: 1 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#FFFFFF' },
-  emptyIconContainer: { width: 120, height: 120, backgroundColor: '#FFF8E7', borderRadius: 60, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
-  emptyTitle: { fontSize: 24, fontWeight: 'bold', color: '#1e293b', marginBottom: 8 },
-  emptySubtitle: { fontSize: 16, color: '#64748b', textAlign: 'center', lineHeight: 24, marginBottom: 32 },
-  browseButton: { backgroundColor: '#3A8C3F', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16 },
-  browseButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
   itemList: { padding: 20 },
   cartItem: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 12, marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#f1f5f9' },
   itemImage: { width: 80, height: 80, borderRadius: 12, backgroundColor: '#f8fafc' },
@@ -490,29 +313,6 @@ const styles = StyleSheet.create({
   footer: { padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, backgroundColor: '#FFFFFF' },
   checkoutBtn: { backgroundColor: '#3A8C3F', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 18, borderRadius: 20, shadowColor: '#3A8C3F', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8 },
   checkoutBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginRight: 8 },
-  receiptOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  receiptContainer: { width: '100%', backgroundColor: '#FFFFFF', borderRadius: 30, overflow: 'hidden', maxHeight: '85%' },
-  receiptHeader: { padding: 32, alignItems: 'center' },
-  receiptStatus: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginTop: 16 },
-  receiptId: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 4 },
-  receiptContent: { padding: 24 },
-  receiptSection: { marginBottom: 24 },
-  receiptLabel: { fontSize: 14, fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
-  receiptRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  receiptRowLabel: { fontSize: 14, color: '#64748b' },
-  receiptRowValue: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
-  receiptItem: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  receiptItemName: { fontSize: 15, color: '#1e293b', flex: 1 },
-  receiptItemPrice: { fontSize: 15, fontWeight: 'bold', color: '#1e293b' },
-  receiptTotal: { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  receiptTotalLabel: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
-  receiptTotalValue: { fontSize: 22, fontWeight: 'bold', color: '#3A8C3F' },
-  receiptFooter: { padding: 24, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  receiptActions: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  receiptActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#f1f5f9' },
-  receiptActionText: { marginLeft: 8, fontSize: 14, fontWeight: '600', color: '#64748b' },
-  doneBtn: { backgroundColor: '#1e293b', paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
-  doneBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
   addressSection: {
     paddingHorizontal: 20,
     marginBottom: 8,

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -19,30 +19,30 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../../src/theme/tokens';
 import { Header } from '../../src/components/Header';
 import { HeroBanner } from '../../src/components/HeroBanner';
+import { FinancialHero } from '../../src/components/ui/hero-section';
 import { CategoryPill } from '../../src/components/CategoryPill';
 import PremiumCard from '../../src/components/ui/PremiumCard';
 import { SkeletonLoader } from '../../src/components/SkeletonLoader';
 import { SearchBar } from '../../src/components/SearchBar';
-import { DestinationCard } from '../../src/components/ui/card';
 import { Toast, ToastHandle } from '../../src/components/ui/Toast';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { useProducts } from '../../src/hooks/useProducts';
-import { analytics } from '../../src/services/AnalyticsService';
-import { ShoppingBag } from 'lucide-react-native';
+import { ShoppingBag, Apple, Bean, Citrus, Leaf, X, Flame } from 'lucide-react-native';
 import { useDebounce } from '../../src/hooks/useDebounce';
-import { Product } from '../../src/types';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCartStore } from '../../src/store/useCartStore';
 import { ProductService } from '../../src/services/ProductService';
-import { Apple, Bean, Cherry, Citrus, Grape, Leaf, Filter, X, ChevronDown, Flame } from 'lucide-react-native';
 import Slideshow from '../../src/components/ui/slideshow';
-import { supabase } from '../../lib/supabase';
-
-const { width } = Dimensions.get('window');
+import { Product } from '../../src/types';
+import { AutoSlidingCarousel } from '../../src/components/AutoSlidingCarousel';
+import { HomeShowcaseSlider } from '../../src/components/HomeShowcaseSlider';
+import { ImageAutoSlider } from '../../src/components/ui/image-auto-slider';
+import { COLORS, SPACING, RADIUS } from '../../src/theme/colors';
+import { TYPOGRAPHY } from '../../src/theme/typography';
+import { getResponsiveCardCount, getResponsiveCardWidth } from '../../src/theme/responsive';
 
 const CATEGORIES = [
   { id: 'all', label: 'All', icon: <Citrus size={24} /> },
@@ -59,16 +59,37 @@ export default function HomeScreen() {
   const { products, loading, refreshing, error, hasMore, loadMore, refresh, retry } = useProducts();
   const [activeCategory, setActiveCategory] = useState('all');
   
-  const { width: windowWidth } = useWindowDimensions();
-  const numColumns = windowWidth > 1024 ? 4 : windowWidth > 768 ? 3 : 2;
-  const gridGap = 16;
-  const cardWidth = (windowWidth - 40 - (gridGap * (numColumns - 1))) / numColumns;
+  const featuredProducts = useMemo(() => {
+    return products.slice(0, 5).map((p, idx) => ({
+      id: p.id,
+      name: p.name,
+      price: ProductService.getPrice(p),
+      image_url: p.image_url || [
+        "https://images.unsplash.com/photo-1622597467836-f3285f2131b8?q=80&w=800",
+        "https://images.unsplash.com/photo-1546173159-315724a31696?q=80&w=800",
+        "https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?q=80&w=800",
+        "https://images.unsplash.com/photo-1595981267035-7b04ca84a82d?q=80&w=800",
+        "https://images.unsplash.com/photo-1613478223719-2ab802602423?q=80&w=800"
+      ][idx % 5],
+      category: p.category,
+      rating: 4.8 // Mock rating
+    }));
+  }, [products]);
 
-  useEffect(() => {
-    if (paramCategory) {
-      setActiveCategory(paramCategory);
-    }
-  }, [paramCategory]);
+  const { width: windowWidth } = useWindowDimensions();
+  
+  const numColumns = useMemo(() => {
+    if (windowWidth >= 1024) return 3;
+    return 2;
+  }, [windowWidth]);
+
+  const gridGap = 12;
+  const horizontalPadding = windowWidth > 768 ? 32 : 12;
+  // Clamp to min 120 so cards never collapse to 0 width on web
+  const cardWidth = Math.max(
+    120,
+    (Math.min(windowWidth, 1400) - (horizontalPadding * 2) - (gridGap * (numColumns - 1))) / numColumns
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
   
@@ -120,10 +141,10 @@ export default function HomeScreen() {
     return result;
   }, [products, activeCategory, debouncedSearch, priceRange, selectedSort]);
 
-  const handleAddToCart = (item: Product) => {
+  const handleAddToCart = useCallback((item: Product) => {
     addItem(item);
     toastRef.current?.show(`${item.name} added to your basket! 🧺`, 'success');
-  };
+  }, [addItem]);
 
   const renderSkeleton = () => (
     <View style={styles.grid}>
@@ -157,37 +178,64 @@ export default function HomeScreen() {
         data={filteredProducts}
         keyExtractor={(item) => item.id}
         numColumns={numColumns}
-        key={numColumns}
+        key={`grid-${numColumns}`}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: horizontalPadding }]}
+        columnWrapperStyle={numColumns > 1 ? { gap: gridGap } : undefined}
         onRefresh={refresh}
         refreshing={refreshing}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         initialNumToRender={8}
-        maxToRenderPerBatch={4}
+        maxToRenderPerBatch={6}
         windowSize={5}
+        updateCellsBatchingPeriod={100}
         removeClippedSubviews={Platform.OS === 'android'}
         ListHeaderComponent={
-          <>
-            <Slideshow />
-            <HeroBanner />
-            <View style={styles.promoSection}>
-               <LinearGradient
-                 colors={['#FFECD2', '#FCB69F']}
-                 style={styles.promoCard}
-                 start={{x: 0, y: 0}}
-                 end={{x: 1, y: 1}}
-               >
-                 <View>
-                   <Text style={styles.promoTitle}>Super Fresh Sale!</Text>
-                   <Text style={styles.promoSubtitle}>Get up to 30% off on all juices</Text>
-                 </View>
-                 <Flame color="#FF512F" size={32} />
-               </LinearGradient>
-            </View>
+          <View style={Platform.OS === 'web' ? { width: '100%', zIndex: 10 } : null}>
+             {Platform.OS === 'web' ? (
+               <FinancialHero 
+                 title={<>Pure Nature, <br /><span style={{ color: COLORS.primaryGreen }}>Pure Health.</span></>}
+                 description="Experience the future of refreshment with our cold-pressed, artisanal juices. Freshly delivered to your doorstep."
+                 buttonText="Shop Now"
+                 buttonLink="#"
+                 imageUrl1="https://images.unsplash.com/photo-1613478223719-2ab802602423?q=80&w=800"
+                 imageUrl2="https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?q=80&w=800"
+               />
+             ) : (
+               <>
+                 <Slideshow />
+                 <HeroBanner />
+               </>
+             )}
+            {!loading && featuredProducts.length > 0 && (
+              <AutoSlidingCarousel 
+                products={featuredProducts} 
+                onPressItem={(id) => router.push({ pathname: '/product/[id]', params: { id } })}
+              />
+            )}
+             <View style={styles.promoSection}>
+                <LinearGradient
+                  colors={['#FFECD2', '#FCB69F']}
+                  style={styles.promoCard}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 1}}
+                >
+                  <View>
+                    <Text style={styles.promoTitle}>Super Fresh Sale!</Text>
+                    <Text style={styles.promoSubtitle}>Get up to 30% off on all juices</Text>
+                  </View>
+                  <Flame color="#FF512F" size={32} />
+                </LinearGradient>
+             </View>
 
-            <View style={styles.categoryContainer}>
+             {Platform.OS === 'web' ? (
+               <ImageAutoSlider products={featuredProducts.slice(0, 6)} />
+             ) : (
+               <HomeShowcaseSlider />
+             )}
+
+             <View style={styles.categoryContainer}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
                 {CATEGORIES.map((cat) => (
                   <CategoryPill
@@ -203,18 +251,19 @@ export default function HomeScreen() {
               </ScrollView>
             </View>
 
+
             <View style={styles.sectionHeader}>
-              <View style={{ paddingHorizontal: 20, marginVertical: 16 }}>
+              <View style={{ paddingHorizontal: 0, marginVertical: 16 }}>
                 <Text style={TYPOGRAPHY.h2}>
                   {activeCategory === 'all' ? 'Popular Items' : `${activeCategory.charAt(0).toUpperCase()}${activeCategory.slice(1)}s`}
                 </Text>
                 <Text style={styles.subtitleText}>Hand-picked freshness for you</Text>
               </View>
             </View>
-          </>
+          </View>
         }
         renderItem={({ item, index }) => (
-          <View style={{ width: cardWidth, marginHorizontal: 8, marginBottom: 16 }}>
+          <View style={{ width: cardWidth, flexShrink: 0 }}>
             <PremiumCard
               id={item.id}
               index={index}
@@ -223,7 +272,7 @@ export default function HomeScreen() {
               price={ProductService.getPrice(item)}
               imageUrl={ProductService.getOptimizedImage(item.image_url, 400)}
               category={item.category}
-              isAvailable={item.is_available}
+              isAvailable={item.is_available !== false}
               onPress={() => router.push({ pathname: '/product/[id]', params: { id: item.id } })}
               onAddToCart={() => handleAddToCart(item)}
             />
@@ -321,7 +370,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: { 
     width: '100%',
-    maxWidth: 1200, // Maximum width for Laptop screens
+    maxWidth: 1400, // High-end desktop width
     paddingBottom: 40,
   },
   promoSection: { paddingHorizontal: SPACING.md, marginTop: SPACING.md },
@@ -364,8 +413,8 @@ const styles = StyleSheet.create({
   grid: { 
     flexDirection: 'row', 
     flexWrap: 'wrap', 
-    justifyContent: 'center', // Center cards on web
-    paddingHorizontal: SPACING.md,
+    justifyContent: 'space-between', 
+    paddingHorizontal: 16,
     gap: 16
   },
   skeletonCard: { width: '48%', marginBottom: SPACING.xl },

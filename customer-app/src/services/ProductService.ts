@@ -30,13 +30,15 @@ export const ProductService = {
    * Also handles legacy localhost URLs from early development by providing safe fallbacks.
    */
   getOptimizedImage: (url?: string, width: number = 400, quality: number = 80): string => {
-    if (!url) return 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400';
-    
+    const FALLBACK = 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400';
+
+    if (!url) return FALLBACK;
+
+    // Reject blurhash strings, base64, relative paths — only accept http/https URLs
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return FALLBACK;
+
     // Handle legacy localhost images from local DB seeds
-    if (url.includes('localhost') || url.includes('127.0.0.1')) {
-      // Fallback to a high-quality product placeholder to avoid ERR_CONNECTION_REFUSED
-      return 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400';
-    }
+    if (url.includes('localhost') || url.includes('127.0.0.1')) return FALLBACK;
 
     if (url.includes('supabase.co')) {
       const isRenderUrl = url.includes('/render/image/public/');

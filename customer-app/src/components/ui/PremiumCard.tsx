@@ -1,30 +1,22 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   StyleSheet, 
   View, 
   Text, 
-  Image, 
-  Dimensions, 
   Pressable, 
   Platform,
-  ViewStyle,
-  ImageStyle,
-  TextStyle
+  Image as RNImage,
 } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
   withSpring, 
   FadeInUp,
-  Layout
 } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, RADIUS } from '../../theme/tokens';
-import { ProductService } from '../../services/ProductService';
-import { Star, ShoppingCart, Heart } from 'lucide-react-native';
-
-const { width } = Dimensions.get('window');
+import { COLORS } from '../../theme/colors';
+import { TYPOGRAPHY } from '../../theme/typography';
+import { Star, ShoppingBag, Heart } from 'lucide-react-native';
+import { getProductImageSource } from '../../utils/imageUtils';
 
 interface PremiumCardProps {
   id: string;
@@ -38,174 +30,183 @@ interface PremiumCardProps {
   onPress: () => void;
   onAddToCart?: () => void;
   isAvailable?: boolean;
-  isLiked?: boolean;
-  onLike?: () => void;
-  variant?: 'minimal' | 'glass' | 'elevated';
+  variant?: string;
 }
 
+/**
+ * Web-safe image renderer.
+ * Uses standard <img> on web to avoid expo-image / RN-Web incompatibilities.
+ * Uses React Native Image on native.
+ */
+const SafeProductImage = React.memo(({ 
+  name, category, imageUrl, style 
+}: { name: string; category: string; imageUrl: string; style?: any }) => {
+  const [errored, setErrored] = useState(false);
+  const source = getProductImageSource(name, category, errored ? undefined : imageUrl);
+
+  if (Platform.OS === 'web') {
+    // Use native <img> on web — avoids ALL expo-image / blurhash / require() issues
+    const uri = (source && source.uri) ? source.uri : 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=800&q=80';
+    return (
+      <img
+        src={uri}
+        alt={name}
+        onError={() => setErrored(true)}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          display: 'block',
+        }}
+      />
+    );
+  }
+
+  // Native: use RN Image with fallback
+  return (
+    <RNImage
+      source={source}
+      style={[StyleSheet.absoluteFill, { resizeMode: 'contain' }]}
+      onError={() => setErrored(true)}
+    />
+  );
+});
+
 const PremiumCard: React.FC<PremiumCardProps> = ({
-  id,
   index,
   title,
-  subtitle,
   price,
   imageUrl,
   category,
-  rating = 4.5,
+  rating = 4.8,
   onPress,
   onAddToCart,
   isAvailable = true,
-  isLiked = false,
-  onLike,
-  variant = 'elevated'
 }) => {
-  const { width: windowWidth } = Dimensions.get('window');
-  const isWeb = Platform.OS === 'web';
-  const isLargeScreen = windowWidth > 768;
-
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
-
-  const CARD_WIDTH = (windowWidth - SPACING.md * (isLargeScreen ? 4 : 3)) / (isLargeScreen ? 3 : 2);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    opacity: opacity.value,
   }));
 
-  const handlePressIn = () => {
-    scale.value = withSpring(0.96, { damping: 10, stiffness: 100 });
-  };
+  const handlePressIn = useCallback(() => {
+    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
+  }, []);
 
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 10, stiffness: 100 });
-  };
+  const handlePressOut = useCallback(() => {
+    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+  }, []);
 
-  const renderBadges = () => (
-    <View style={styles.badgeContainer}>
-      <BlurView intensity={20} style={styles.ratingBadge}>
-        <Star size={10} color="#FFB800" fill="#FFB800" />
-        <Text style={styles.ratingText}>{rating}</Text>
-      </BlurView>
-      {onLike && (
-        <Pressable onPress={onLike} style={styles.likeBtn}>
-          <Heart size={16} color={isLiked ? '#FF4B2B' : COLORS.white} fill={isLiked ? '#FF4B2B' : 'transparent'} />
-        </Pressable>
-      )}
-    </View>
-  );
+  const handleAddToCart = useCallback((e: any) => {
+    e.stopPropagation();
+    onAddToCart?.();
+  }, [onAddToCart]);
+
+  const delay = Math.min((index % 6) * 60, 300);
 
   return (
-    <Animated.View 
-      entering={FadeInUp.delay(Math.min((index % 10) * 100, 1000)).springify().damping(12)}
-      layout={Layout.springify()}
-      style={[styles.container, { width: isWeb ? 'auto' : CARD_WIDTH }, animatedStyle]}
-    >
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={({ pressed }) => [
-          styles.pressable,
-          variant === 'elevated' && styles.elevatedShadow,
-          !isAvailable && styles.disabled
-        ]}
-      >
-        <View style={[styles.imageWrapper, { aspectRatio: 0.85 }]}>
-          <Image 
-            source={{ uri: imageUrl }} 
-            style={styles.image} 
-            resizeMode="contain" 
-          />
-          {renderBadges()}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.5)']}
-            style={styles.imageOverlay}
-          />
-          {!isAvailable && (
-            <BlurView intensity={30} style={styles.soldOutBadge}>
-              <Text style={styles.soldOutText}>Sold Out</Text>
-            </BlurView>
-          )}
-        </View>
+    // OUTER: handles FadeInUp entrance — NO transform style here
+    <Animated.View entering={FadeInUp.delay(delay).springify()}>
+      {/* INNER: handles scale press transform — separate from layout animation */}
+      <Animated.View style={[styles.container, animatedStyle]}>
+        <Pressable
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={styles.card}
+          accessibilityRole="button"
+          accessibilityLabel={`${title}, ₹${Math.round(price)}`}
+        >
+          {/* Image Section */}
+          <View style={styles.imageSection}>
+            <SafeProductImage
+              name={title}
+              category={category || 'juice'}
+              imageUrl={imageUrl}
+              style={styles.image}
+            />
 
-        <View style={styles.content}>
-          {category && <Text style={styles.category}>{category}</Text>}
-          <Text style={styles.title} numberOfLines={1}>{title}</Text>
-          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-          
-          <View style={styles.footer}>
-            <View>
-              <Text style={styles.priceSymbol}>{ProductService.formatPrice(price)}</Text>
-              <Text style={styles.unit}>per unit</Text>
+            {/* Badges */}
+            <View style={styles.badgeRow}>
+              <View style={styles.ratingBadge}>
+                <Star size={10} color={COLORS.primaryOrange} fill={COLORS.primaryOrange} />
+                <Text style={styles.ratingText}>{rating}</Text>
+              </View>
+              <Pressable style={styles.heartBtn} accessibilityLabel="Add to wishlist">
+                <Heart size={14} color={COLORS.mutedGray} />
+              </Pressable>
             </View>
 
-            {onAddToCart && isAvailable && (
-              <Pressable 
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onAddToCart();
-                }}
-                style={styles.addToCartBtn}
-              >
-                <LinearGradient
-                  colors={[COLORS.primaryGreen, '#1b5e20']}
-                  style={styles.cartGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <ShoppingCart size={16} color={COLORS.white} />
-                </LinearGradient>
-              </Pressable>
+            {/* Sold out overlay */}
+            {!isAvailable && (
+              <View style={styles.soldOutOverlay}>
+                <Text style={styles.soldOutText}>RESERVED</Text>
+              </View>
             )}
           </View>
-        </View>
-      </Pressable>
+
+          {/* Text Content */}
+          <View style={styles.content}>
+            <Text style={styles.category}>{(category || 'COLLECTION').toUpperCase()}</Text>
+            <Text style={styles.title} numberOfLines={1}>{title}</Text>
+
+            <View style={styles.footer}>
+              <Text style={styles.price}>₹{Math.round(price)}</Text>
+              {onAddToCart && isAvailable && (
+                <Pressable
+                  onPress={handleAddToCart}
+                  style={styles.cartBtn}
+                  accessibilityLabel={`Add ${title} to cart`}
+                >
+                  <ShoppingBag size={16} color={COLORS.white} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    marginBottom: SPACING.md,
+    padding: 6,
   },
-  pressable: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
+  card: {
+    backgroundColor: COLORS.cream,
+    borderRadius: 28,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.03)',
-  },
-  elevatedShadow: {
+    borderColor: COLORS.border,
+    minHeight: 260,
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.1,
-        shadowRadius: 15,
-      },
-      android: {
-        elevation: 6,
+      web: {
+        boxShadow: '0 6px 20px -8px rgba(0,0,0,0.08)',
+      } as any,
+      default: {
+        elevation: 4,
+        shadowColor: COLORS.luxuryDark,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
       },
     }),
   },
-  disabled: {
-    opacity: 0.8,
-  },
-  imageWrapper: {
+  imageSection: {
+    aspectRatio: 1,
+    backgroundColor: COLORS.softBeige,
+    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#f8fafc', // Light background for 'contain' mode
-    padding: 10,
   },
   image: {
-    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  badgeContainer: {
+  badgeRow: {
     position: 'absolute',
     top: 10,
     left: 10,
@@ -218,94 +219,67 @@ const styles = StyleSheet.create({
   ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    overflow: 'hidden',
-    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
   },
   ratingText: {
     fontSize: 10,
     fontWeight: '800',
-    color: COLORS.darkText,
+    color: COLORS.luxuryDark,
   },
-  likeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+  heartBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.92)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  soldOutBadge: {
+  soldOutOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 5,
   },
   soldOutText: {
-    color: COLORS.white,
-    fontWeight: '900',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    ...TYPOGRAPHY.label,
+    color: COLORS.mutedGray,
+    fontSize: 10,
+    letterSpacing: 2,
   },
   content: {
-    padding: 14,
+    padding: 16,
+    paddingTop: 10,
   },
   category: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.mutedGray,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
+    ...TYPOGRAPHY.label,
+    fontSize: 9,
+    letterSpacing: 1.5,
+    marginBottom: 3,
   },
   title: {
+    ...TYPOGRAPHY.h3,
     fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.darkText,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'System', // Will use Poppins if loaded in App.tsx
-  },
-  subtitle: {
-    fontSize: 12,
-    color: COLORS.mutedGray,
-    marginTop: 2,
+    marginBottom: 10,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 12,
-  },
-  priceSymbol: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primaryGreen,
+    alignItems: 'center',
   },
   price: {
-    fontSize: 20,
-    fontWeight: '900',
+    ...TYPOGRAPHY.price,
+    fontSize: 18,
   },
-  unit: {
-    fontSize: 10,
-    color: COLORS.mutedGray,
-    marginTop: -2,
-    fontWeight: '600',
-  },
-  addToCartBtn: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: COLORS.primaryGreen,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  cartGradient: {
-    width: 38,
-    height: 38,
+  cartBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 13,
+    backgroundColor: COLORS.primaryOrange,
     justifyContent: 'center',
     alignItems: 'center',
   },

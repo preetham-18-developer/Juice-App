@@ -29,6 +29,10 @@ interface OrderItem {
   products: Product;
 }
 
+import { useOrderTracking } from '../../src/hooks/useOrderTracking';
+import { OrderTracker } from '../../src/components/OrderTracker';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -37,6 +41,15 @@ export default function OrderDetailsScreen() {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+
+  const { 
+    currentStatus, 
+    currentStepIndex, 
+    progressPercent, 
+    estimatedDelivery, 
+    isDelivered, 
+    isCancelled 
+  } = useOrderTracking(id as string);
 
   useEffect(() => {
     if (id) fetchOrderDetails();
@@ -70,28 +83,6 @@ export default function OrderDetailsScreen() {
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'received': return <Clock size={24} color="#3b82f6" />;
-      case 'pending_payment': return <Clock size={24} color="#94a3b8" />;
-      case 'processing': return <Package size={24} color="#f59e0b" />;
-      case 'completed': return <CheckCircle2 size={24} color="#10b981" />;
-      case 'cancelled': return <XCircle size={24} color="#ef4444" />;
-      default: return <Clock size={24} color="#64748b" />;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'received': return 'Order Received';
-      case 'pending_payment': return 'Awaiting Payment';
-      case 'processing': return 'Processing';
-      case 'completed': return 'Delivered';
-      case 'cancelled': return 'Cancelled';
-      default: return status.toUpperCase();
-    }
-  };
-
   const generatePDF = async () => {
     if (!order) return;
     setDownloading(true);
@@ -118,7 +109,7 @@ export default function OrderDetailsScreen() {
             <div class="order-info">
               <div>
                 <strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}<br>
-                <strong>Status:</strong> ${order.status.toUpperCase()}<br>
+                <strong>Status:</strong> ${currentStatus}<br>
                 <strong>Payment:</strong> ${order.payment_type.toUpperCase()}
               </div>
               <div>
@@ -196,28 +187,30 @@ export default function OrderDetailsScreen() {
           <ChevronLeft size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Order Details</Text>
-        <TouchableOpacity 
-          style={[styles.downloadBtn, downloading && { opacity: 0.5 }]} 
-          onPress={generatePDF}
-          disabled={downloading}
-        >
-          {downloading ? <ActivityIndicator size={20} color={theme.primary} /> : <Download size={22} color={theme.primary} />}
-        </TouchableOpacity>
+        {isDelivered ? (
+          <TouchableOpacity 
+            style={[styles.downloadBtn, downloading && { opacity: 0.5 }]} 
+            onPress={generatePDF}
+            disabled={downloading}
+          >
+            {downloading ? <ActivityIndicator size={20} color={theme.primary} /> : <Download size={22} color={theme.primary} />}
+          </TouchableOpacity>
+        ) : <View style={{ width: 32 }} />}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Status Card */}
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.statusHeader}>
-            {getStatusIcon(order.status)}
-            <View style={styles.statusInfo}>
-              <Text style={[styles.statusLabel, { color: theme.text }]}>{getStatusLabel(order.status)}</Text>
-              <Text style={[styles.statusDate, { color: theme.textSecondary }]}>
-                {new Date(order.created_at).toLocaleDateString()} at {new Date(order.created_at).toLocaleTimeString()}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+        
+        {/* Premium Animated Tracker */}
+        <Animated.View entering={FadeInDown.delay(100).springify()}>
+          <OrderTracker 
+            currentStepIndex={currentStepIndex}
+            progressPercent={progressPercent}
+            estimatedDelivery={estimatedDelivery}
+            currentStatus={currentStatus}
+          />
+        </Animated.View>
+
+        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 16 }]}>
           <View style={styles.orderMeta}>
             <View style={styles.metaItem}>
               <Calendar size={16} color={theme.textSecondary} />
@@ -227,10 +220,14 @@ export default function OrderDetailsScreen() {
               <CreditCard size={16} color={theme.textSecondary} />
               <Text style={[styles.metaText, { color: theme.textSecondary }]}>{order.payment_type.toUpperCase()}</Text>
             </View>
+            <View style={styles.metaItem}>
+              <Clock size={16} color={theme.textSecondary} />
+              <Text style={[styles.metaText, { color: theme.textSecondary }]}>
+                {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
           </View>
-        </View>
-
-        {/* Items Section */}
+        </View>        {/* Items Section */}
         <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Items Ordered</Text>
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {items.map((item, index) => (

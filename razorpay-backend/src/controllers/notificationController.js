@@ -16,7 +16,14 @@ const whatsappFrom = process.env.TWILIO_WHATSAPP_FROM
 
 let client;
 if (accountSid && authToken) {
-    client = twilio(accountSid, authToken);
+    try {
+        client = twilio(accountSid, authToken);
+        console.log('[Notification] Twilio client initialized successfully.');
+    } catch (e) {
+        console.error('[Notification] Twilio initialization error:', e.message);
+    }
+} else {
+    console.warn('[Notification] Twilio credentials missing: SID:', !!accountSid, 'Token:', !!authToken);
 }
 
 exports.sendOrderNotification = async (req, res) => {
@@ -106,27 +113,37 @@ https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}` : ''}
         // Send to Customer
         if (customerPhone && customerPhone !== 'N/A') {
             try {
-                let formattedCustomerPhone = customerPhone.replace(/\D/g, '');
+                let rawPhone = customerPhone.toString();
+                let formattedCustomerPhone = rawPhone.replace(/\D/g, '');
+                
+                // If it's a 10-digit number, assume India (+91)
                 if (formattedCustomerPhone.length === 10) {
                     formattedCustomerPhone = `+91${formattedCustomerPhone}`;
-                } else if (!customerPhone.startsWith('+')) {
+                } else if (!rawPhone.startsWith('+')) {
                     formattedCustomerPhone = `+${formattedCustomerPhone}`;
                 } else {
-                    formattedCustomerPhone = customerPhone;
+                    formattedCustomerPhone = rawPhone; // Already has +
                 }
+
+                const toCustomer = `whatsapp:${formattedCustomerPhone}`;
+                const fromNum = whatsappFrom;
+                
+                console.log(`[Twilio] ATTEMPTING CUSTOMER WHATSAPP -> To: ${toCustomer}, From: ${fromNum}`);
 
                 const customerMessage = `Hi ${customerName},\n\nYour order #${id.slice(0, 6).toUpperCase()} has been received and is being processed!\n\nTotal: ₹${total}\nPayment: ${paymentType === 'cod' ? 'Cash on Delivery' : 'Online Payment'}\n\nThank you for choosing Juicy App! 🧃`;
 
                 customerWhatsappResponse = await client.messages.create({
                     body: customerMessage,
-                    from: whatsappFrom,
-                    to: `whatsapp:${formattedCustomerPhone}`
+                    from: fromNum,
+                    to: toCustomer
                 });
-                console.log(`[Notification] Customer WhatsApp sent: ${customerWhatsappResponse.sid}`);
+                console.log(`[Twilio] SUCCESS! Customer WhatsApp SID: ${customerWhatsappResponse.sid}`);
             } catch (err) {
-                console.error('[Notification] Failed to send Customer WhatsApp:', err.message);
+                console.error('[Twilio] ERROR sending to customer:', err.message, '| Attempted Phone:', customerPhone);
             }
         }
+    } else {
+        console.log('[Twilio] WhatsApp disabled. ENABLE_WHATSAPP is:', process.env.ENABLE_WHATSAPP);
     }
 
     res.status(200).json({ 

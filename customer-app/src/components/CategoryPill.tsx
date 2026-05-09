@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
-import { COLORS, TYPOGRAPHY, RADIUS, SPACING } from '../theme/tokens';
+import { COLORS, SPACING, RADIUS } from '../theme/colors';
+import { TYPOGRAPHY } from '../theme/typography';
 
 interface CategoryPillProps {
   label: string;
