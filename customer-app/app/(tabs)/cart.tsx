@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -10,10 +10,11 @@ import {
   Alert,
   Dimensions,
   Platform,
+  TextInput,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useCartStore } from '../../src/store/useCartStore';
-import { Trash2, Plus, Minus, ChevronRight, ShoppingBag, CreditCard, Banknote } from 'lucide-react-native';
+import { Trash2, Plus, Minus, ChevronRight, ShoppingBag, CreditCard, Banknote, Phone } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { Toast, ToastHandle } from '../../src/components/ui/Toast';
@@ -30,6 +31,34 @@ export default function CartScreen() {
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
   const [loading, setLoading] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUser(user);
+        fetchUserProfile(user.id);
+      }
+    });
+  }, []);
+
+  async function fetchUserProfile(userId: string) {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', userId)
+        .single();
+      
+      if (data?.phone) {
+        setPhoneNumber(data.phone);
+      }
+    } catch (e) {
+      console.warn('[Cart] Failed to fetch profile:', e);
+    }
+  }
+
   const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
   const toastRef = React.useRef<ToastHandle>(null);
 
@@ -39,24 +68,22 @@ export default function CartScreen() {
 
   const handleCheckout = async () => {
     if (loading) return;
+
+    if (!selectedAddress || !selectedAddress.formattedAddress) {
+      toastRef.current?.show("Please select or enter a delivery address.", 'error');
+      return;
+    }
+
+    if (!phoneNumber || phoneNumber.length < 10) {
+      toastRef.current?.show("Please enter a valid 10-digit WhatsApp number", 'error');
+      return;
+    }
     
     try {
       setLoading(true);
-      const { data: { user }, error } = await supabase.auth.getUser();
       
-      if (error || !user) {
-        console.warn("[Checkout] Auth failure:", error?.message);
-        toastRef.current?.show('Please login to place an order.', 'error');
-        setLoading(false);
-        return;
-      }
-
-      // 1. Strict Address Validation
-      if (!selectedAddress || !selectedAddress.formattedAddress) {
-        toastRef.current?.show("Please select or enter a delivery address.", 'error');
-        setLoading(false);
-        return;
-      }
+      // Sync phone to profile
+      await supabase.from('profiles').update({ phone: phoneNumber }).eq('id', user?.id);
 
       const { city, state, formattedAddress } = selectedAddress;
       
@@ -88,7 +115,7 @@ export default function CartScreen() {
             orderId: orderId,
             name: user.user_metadata?.full_name || 'Customer',
             email: user.email || '',
-            contact: user.user_metadata?.phone || '',
+            contact: phoneNumber,
           }
         });
       } else {
@@ -103,20 +130,16 @@ export default function CartScreen() {
 
   const processOrder = async (userId: string, paymentId: string, addressOverride?: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const finalAddress = addressOverride || selectedAddress?.formattedAddress || user?.user_metadata?.permanent_address || 'Default Address';
-
+      const finalAddress = addressOverride || selectedAddress?.formattedAddress || 'Default Address';
       const orderId = await placeOrder(userId, finalAddress, paymentMethod, 'PENDING', selectedAddress || undefined);
 
       if (orderId) {
-        // 1. Initialize tracking immediately
         await OrderTrackingService.initializeTracking(orderId);
 
-        // 2. Send WhatsApp notification (fire & forget)
         const orderPayload = {
           id: orderId,
           customerName: user?.user_metadata?.full_name || 'Valued Customer',
-          customerPhone: user?.user_metadata?.phone || 'N/A',
+          customerPhone: phoneNumber,
           address: finalAddress,
           landmark: selectedAddress?.landmark,
           latitude: selectedAddress?.latitude || 0,
@@ -126,15 +149,10 @@ export default function CartScreen() {
           paymentType: paymentMethod,
           createdAt: new Date().toISOString(),
         };
-        console.log('[Checkout] Dispatching notification for COD:', orderPayload.customerPhone);
-        NotificationService.sendOrderNotification(orderPayload).catch(e =>
-          console.warn('[Checkout] Notification failed silently:', e.message)
-        );
+        
+        NotificationService.sendOrderNotification(orderPayload).catch(console.error);
 
-        // 3. Clear cart
         clearCart();
-
-        // 4. Navigate to live order tracking screen
         toastRef.current?.show('Order placed! Tracking your delivery...', 'success');
         setTimeout(() => {
           router.replace(`/orders/${orderId}` as any);
@@ -145,7 +163,6 @@ export default function CartScreen() {
       }
     } catch (err: any) {
       setLoading(false);
-      console.error('[Checkout] processOrder error:', err.message);
       Alert.alert('Error', 'An unexpected error occurred while placing your order.');
     }
   };
@@ -207,7 +224,22 @@ export default function CartScreen() {
         </View>
 
         <View style={styles.addressSection}>
-          <Text style={styles.sectionTitle}>Delivery Location</Text>
+          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <View style={styles.phoneInputContainer}>
+            <View style={styles.phoneIconBox}>
+              <Phone size={18} color="#64748b" />
+            </View>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="10-digit WhatsApp Number"
+              keyboardType="phone-pad"
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              maxLength={10}
+            />
+          </View>
+
+          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Delivery Location</Text>
           <AddressPicker 
             onAddressSelect={handleAddressSelect}
             initialAddress={selectedAddress || { formattedAddress: '' }}
@@ -315,6 +347,28 @@ const styles = StyleSheet.create({
   checkoutBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold', marginRight: 8 },
   addressSection: {
     paddingHorizontal: 20,
-    marginBottom: 8,
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 20,
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginTop: 8,
+  },
+  phoneInputContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#f8fafc', 
+    borderRadius: 16, 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 16
+  },
+  phoneIconBox: { marginRight: 12 },
+  phoneInput: { 
+    flex: 1, 
+    height: 54, 
+    fontSize: 16, 
+    color: '#1e293b',
+    fontWeight: '500' 
   },
 });

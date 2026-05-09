@@ -227,7 +227,8 @@ export default function OrderDetailsScreen() {
               </Text>
             </View>
           </View>
-        </View>        {/* Items Section */}
+        </View>
+        {/* Items Section */}
         <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Items Ordered</Text>
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {items.map((item, index) => (

@@ -139,9 +139,9 @@ const Step = memo(({ status, index, isCompleted, isActive, isLast }: StepProps) 
         >
           {ORDER_STATUS_LABELS[status]}
         </Text>
-        {(isActive || isCompleted) && (
+        {(isActive || isCompleted) && status && (
           <Text style={[styles.stepDesc, isActive && { color: color }]}>
-            {ORDER_STATUS_DESCRIPTIONS[status]}
+            {ORDER_STATUS_DESCRIPTIONS[status] || ''}
           </Text>
         )}
       </View>

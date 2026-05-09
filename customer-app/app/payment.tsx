@@ -243,10 +243,11 @@ export default function PaymentScreen() {
           paymentType: 'online',
           createdAt: new Date().toISOString(),
         };
-        NotificationService.sendOrderNotification(orderPayload);
-      } catch (notifErr) {
-        console.warn('[Payment] Notification skipped:', notifErr);
-      }
+        try {
+          NotificationService.sendOrderNotification(orderPayload);
+        } catch (notifErr) {
+          console.warn('[Payment] Notification skipped:', notifErr);
+        }
 
       setPaymentState('PAYMENT_SUCCESS');
       clearCart();

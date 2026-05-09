@@ -98,17 +98,33 @@ https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}` : ''}
     let whatsappResponse = null;
     let customerWhatsappResponse = null;
     if (process.env.ENABLE_WHATSAPP === 'true') {
-        // Ensure admin phone has + prefix
-        const toAdmin = whatsappAdminPhone.startsWith('+')
-          ? `whatsapp:${whatsappAdminPhone}`
-          : `whatsapp:+${whatsappAdminPhone}`;
+        // Send to Admin
+        if (whatsappAdminPhone) {
+            try {
+                let adminRaw = whatsappAdminPhone.toString();
+                let adminFormatted = adminRaw.replace(/\D/g, '');
+                
+                if (adminFormatted.length === 10) {
+                    adminFormatted = `+91${adminFormatted}`;
+                } else if (!adminRaw.startsWith('+')) {
+                    adminFormatted = `+${adminFormatted}`;
+                } else {
+                    adminFormatted = adminRaw;
+                }
 
-        whatsappResponse = await client.messages.create({
-            body: message,
-            from: whatsappFrom,
-            to: toAdmin
-        });
-        console.log(`[Notification] Admin WhatsApp sent: ${whatsappResponse.sid}`);
+                const toAdmin = `whatsapp:${adminFormatted}`;
+                console.log(`[Twilio] ATTEMPTING ADMIN WHATSAPP -> To: ${toAdmin}, From: ${whatsappFrom}`);
+
+                whatsappResponse = await client.messages.create({
+                    body: message,
+                    from: whatsappFrom,
+                    to: toAdmin
+                });
+                console.log(`[Twilio] SUCCESS! Admin WhatsApp SID: ${whatsappResponse.sid}`);
+            } catch (err) {
+                console.error('[Twilio] ERROR sending to admin:', err.message, '| Admin Phone:', whatsappAdminPhone);
+            }
+        }
 
         // Send to Customer
         if (customerPhone && customerPhone !== 'N/A') {
