@@ -32,6 +32,9 @@ const { width } = Dimensions.get('window');
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [touched, setTouched] = useState({ email: false, password: false });
   const [loading, setLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const segments = useSegments();
@@ -93,9 +96,27 @@ export default function LoginScreen() {
     }
   }, [loginSuccess]);
 
+  const validateEmail = (val: string) => {
+    if (!val) return "Please enter your email";
+    if (!/\S+@\S+\.\S+/.test(val)) return "Please enter a valid email address";
+    return null;
+  };
+
+  const validatePassword = (val: string) => {
+    if (!val) return "Please enter your password";
+    if (val.length < 6) return "Password must be at least 6 chars";
+    return null;
+  };
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      return toastRef.current?.show('Please enter your email and password.', 'error');
+    const eErr = validateEmail(email);
+    const pErr = validatePassword(password);
+    
+    if (eErr || pErr) {
+      setEmailError(eErr);
+      setPasswordError(pErr);
+      setTouched({ email: true, password: true });
+      return;
     }
     
     setLoading(true);
@@ -111,21 +132,31 @@ export default function LoginScreen() {
         });
 
         if (error) {
-          // Check for specific common errors
-          if (error.message.includes('Invalid login credentials')) {
-            toastRef.current?.show('Invalid email or password.', 'error');
-            setLoading(false);
-            return;
+          // Explicitly handle all auth errors to prevent silent failures
+          console.error("[Auth] Login error details:", error);
+          
+          let userMessage = 'Invalid email or password.';
+          if (error.message.includes('Email not confirmed')) {
+            userMessage = 'Please verify your email address before signing in.';
+          } else if (error.message.includes('Rate limit')) {
+            userMessage = 'Too many attempts. Please wait a moment.';
+          } else if (error.message.includes('Database error')) {
+            userMessage = 'Server maintenance in progress. Try again soon.';
           }
-          throw error;
+          
+          toastRef.current?.show(userMessage, 'error');
+          setLoading(false);
+          return;
         }
 
         if (data?.session) {
           setLoginSuccess(true);
         }
       } catch (err: any) {
-        const isNetworkError = err.message.toLowerCase().includes('network') || 
-                              err.message.toLowerCase().includes('fetch');
+        console.error("[Auth] performSignIn critical exception:", err);
+        const errorMessage = err?.message || 'Connection issue. Please try again.';
+        const isNetworkError = errorMessage.toLowerCase().includes('network') || 
+                              errorMessage.toLowerCase().includes('fetch');
 
         if (attempt < maxRetries && isNetworkError) {
           const delay = baseDelay * Math.pow(2, attempt);
@@ -135,7 +166,7 @@ export default function LoginScreen() {
         }
 
         setLoading(false);
-        toastRef.current?.show('Connection issue. Please try again.', 'error');
+        toastRef.current?.show(errorMessage, 'error');
       }
     };
 
@@ -185,34 +216,86 @@ export default function LoginScreen() {
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
-              <View style={styles.inputContainer}>
-                <Mail size={20} color="#94a3b8" />
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Email Address</Text>
+                {emailError && touched.email && (
+                  <Animated.View entering={FadeInUp} style={styles.errorContainer}>
+                    <Text style={styles.errorTextSmall}>{emailError}</Text>
+                  </Animated.View>
+                )}
+              </View>
+              <View style={[
+                styles.inputContainer,
+                emailError && touched.email && styles.inputError,
+                !emailError && touched.email && email.length > 0 && styles.inputSuccess
+              ]}>
+                <Mail size={20} color={emailError && touched.email ? "#ef4444" : (email.length > 0 && !emailError ? COLORS.primaryGreen : "#94a3b8")} />
                 <TextInput 
                   style={styles.input}
                   placeholder="john@example.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(val) => {
+                    setEmail(val);
+                    if (touched.email) setEmailError(validateEmail(val));
+                  }}
+                  onBlur={() => {
+                    setTouched(prev => ({ ...prev, email: true }));
+                    setEmailError(validateEmail(email));
+                  }}
                   placeholderTextColor="#94a3b8"
                 />
+                {!emailError && touched.email && email.length > 0 && (
+                  <Animated.View entering={ZoomIn}>
+                    <CheckCircle size={18} color={COLORS.primaryGreen} />
+                  </Animated.View>
+                )}
               </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.inputContainer}>
-                <Lock size={20} color="#94a3b8" />
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Password</Text>
+                {passwordError && touched.password && (
+                  <Animated.View entering={FadeInUp} style={styles.errorContainer}>
+                    <Text style={styles.errorTextSmall}>{passwordError}</Text>
+                  </Animated.View>
+                )}
+              </View>
+              <View style={[
+                styles.inputContainer,
+                passwordError && touched.password && styles.inputError,
+                !passwordError && touched.password && password.length > 0 && styles.inputSuccess
+              ]}>
+                <Lock size={20} color={passwordError && touched.password ? "#ef4444" : (password.length > 0 && !passwordError ? COLORS.primaryGreen : "#94a3b8")} />
                 <TextInput 
                   style={styles.input}
                   placeholder="••••••••"
                   secureTextEntry
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(val) => {
+                    setPassword(val);
+                    if (touched.password) setPasswordError(validatePassword(val));
+                  }}
+                  onBlur={() => {
+                    setTouched(prev => ({ ...prev, password: true }));
+                    setPasswordError(validatePassword(password));
+                  }}
                   placeholderTextColor="#94a3b8"
                 />
+                {!passwordError && touched.password && password.length > 0 && (
+                  <Animated.View entering={ZoomIn}>
+                    <CheckCircle size={18} color={COLORS.primaryGreen} />
+                  </Animated.View>
+                )}
               </View>
+              <TouchableOpacity 
+                onPress={() => router.push('/forgot-password')}
+                style={styles.forgotBtn}
+              >
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity 
@@ -222,7 +305,7 @@ export default function LoginScreen() {
               disabled={loading || loginSuccess}
             >
               <LinearGradient
-                colors={['#10b981', '#059669']}
+                colors={loading || (emailError || passwordError) && (touched.email || touched.password) ? ['#d1d5db', '#9ca3af'] : ['#10b981', '#059669']}
                 style={styles.loginBtn}
               >
                 {loading ? (
@@ -382,9 +465,16 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 15, color: '#065f46', textAlign: 'center', marginTop: 8, opacity: 0.7 },
   form: { padding: 30, paddingBottom: 50 },
   inputGroup: { marginBottom: 15 },
-  label: { fontSize: 14, color: '#374151', marginBottom: 8, marginLeft: 4, fontWeight: '600' },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: '#e5e7eb' },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  label: { fontSize: 14, color: '#374151', fontWeight: '600' },
+  errorTextSmall: { fontSize: 11, color: '#ef4444', fontWeight: '700' },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 16, paddingHorizontal: 16, borderWidth: 1.5, borderColor: '#e5e7eb', transition: 'all 0.2s' },
+  inputError: { borderColor: '#ef4444', backgroundColor: '#fff1f2' },
+  inputSuccess: { borderColor: COLORS.primaryGreen, backgroundColor: '#f0fdf4' },
+  errorContainer: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   input: { flex: 1, paddingVertical: 16, marginLeft: 12, fontSize: 16, color: '#111827' },
+  forgotBtn: { alignSelf: 'flex-end', marginTop: 10, paddingVertical: 4 },
+  forgotText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   loginBtnContainer: { marginTop: 25, borderRadius: 18, overflow: 'hidden', elevation: 8, shadowColor: '#10b981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12 },
   loginBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 18 },
   loginBtnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginRight: 10 },

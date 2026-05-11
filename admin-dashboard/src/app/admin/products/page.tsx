@@ -16,11 +16,16 @@ import {
   Download,
   AlertTriangle,
   Package,
-  ArrowUpRight
+  ArrowUpRight,
+  Loader2,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useRealtime } from '@/hooks/useRealtime';
 
 interface Product {
   id: string;
@@ -37,13 +42,21 @@ const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
-  const fetchProducts = async () => {
+  // REALTIME AUTO-REFRESH
+  useRealtime([
+    { table: 'products', callback: () => fetchProducts(true) }
+  ]);
+
+  const fetchProducts = async (isBackground = false) => {
     try {
+      if (!isBackground) setLoading(true);
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -55,6 +68,36 @@ const ProductsPage = () => {
       console.error('Error fetching products:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) return;
+    
+    setDeletingId(id);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setProducts(products.filter(p => p.id !== id));
+      toast({
+        title: "Product Deleted",
+        description: "The product has been successfully removed from the catalog.",
+        variant: "success",
+      });
+    } catch (err: any) {
+      console.error('Error deleting product:', err);
+      toast({
+        title: "Delete Failed",
+        description: err.message || "Failed to delete product. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -98,14 +141,21 @@ const ProductsPage = () => {
         </div>
       </div>
       <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-        <button className="flex-1 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2">
+        <button 
+          onClick={() => router.push(`/admin/products/${product.id}/edit`)}
+          className="flex-1 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2"
+        >
           <Edit size={14} /> Edit
         </button>
         <button className="flex-1 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2">
           <Eye size={14} /> Preview
         </button>
-        <button className="px-4 py-2.5 bg-rose-50 rounded-xl text-rose-500">
-          <Trash2 size={14} />
+        <button 
+          onClick={() => handleDeleteProduct(product.id)}
+          disabled={deletingId === product.id}
+          className="px-4 py-2.5 bg-rose-50 rounded-xl text-rose-500 disabled:opacity-50"
+        >
+          {deletingId === product.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
         </button>
       </div>
     </motion.div>
@@ -113,6 +163,7 @@ const ProductsPage = () => {
 
   return (
     <AdminLayout>
+
       {/* Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
@@ -144,7 +195,7 @@ const ProductsPage = () => {
             placeholder="Search items..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-xl text-xs font-medium focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
           />
         </div>
         <button className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500">
@@ -201,8 +252,19 @@ const ProductsPage = () => {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button className="p-2 text-slate-400 hover:text-primary"><Edit size={18} /></button>
-                      <button className="p-2 text-slate-400 hover:text-rose-500"><Trash2 size={18} /></button>
+                      <button 
+                        onClick={() => router.push(`/admin/products/${product.id}/edit`)}
+                        className="p-2 text-slate-400 hover:text-primary transition-colors"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteProduct(product.id)}
+                        disabled={deletingId === product.id}
+                        className="p-2 text-slate-400 hover:text-rose-500 transition-colors disabled:opacity-50"
+                      >
+                        {deletingId === product.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                      </button>
                     </div>
                   </td>
                 </tr>

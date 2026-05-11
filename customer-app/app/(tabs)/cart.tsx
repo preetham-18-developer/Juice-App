@@ -27,7 +27,17 @@ import { OrderTrackingService } from '../../src/services/orderTrackingService';
 const { width } = Dimensions.get('window');
 
 export default function CartScreen() {
-  const { items, removeItem, updateQuantity, getTotal, placeOrder, clearCart } = useCartStore();
+  const { 
+    items, 
+    removeItem, 
+    updateQuantity, 
+    getTotal, 
+    getGrandTotal, 
+    deliveryFee, 
+    updateDeliveryFee, 
+    placeOrder, 
+    clearCart 
+  } = useCartStore();
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
   const [loading, setLoading] = useState(false);
@@ -62,9 +72,16 @@ export default function CartScreen() {
   const [selectedAddress, setSelectedAddress] = useState<AddressData | null>(null);
   const toastRef = React.useRef<ToastHandle>(null);
 
-  const handleAddressSelect = React.useCallback((addr: AddressData) => {
+  const handleAddressSelect = React.useCallback(async (addr: AddressData) => {
     setSelectedAddress(addr);
-  }, []);
+    if (addr.latitude && addr.longitude) {
+      try {
+        await updateDeliveryFee(addr.latitude, addr.longitude);
+      } catch (err: any) {
+        toastRef.current?.show(err.message || "Delivery not available for this location", 'error');
+      }
+    }
+  }, [updateDeliveryFee]);
 
   const handleCheckout = async () => {
     if (loading) return;
@@ -93,7 +110,7 @@ export default function CartScreen() {
         return;
       }
 
-      const totalAmount = getTotal();
+      const totalAmount = getGrandTotal();
       if (totalAmount <= 0) {
         Alert.alert('Invalid Cart', 'Your cart is empty.');
         setLoading(false);
@@ -145,7 +162,7 @@ export default function CartScreen() {
           latitude: selectedAddress?.latitude || 0,
           longitude: selectedAddress?.longitude || 0,
           items: items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
-          total: getTotal(),
+          total: getGrandTotal(),
           paymentType: paymentMethod,
           createdAt: new Date().toISOString(),
         };
@@ -285,11 +302,13 @@ export default function CartScreen() {
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Delivery Fee</Text>
-            <Text style={styles.summaryValue}>₹0.00</Text>
+            <Text style={[styles.summaryValue, deliveryFee === 0 && { color: '#10b981' }]}>
+              {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee.toFixed(2)}`}
+            </Text>
           </View>
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{ProductService.formatPrice(getTotal())}</Text>
+            <Text style={styles.totalValue}>{ProductService.formatPrice(getGrandTotal())}</Text>
           </View>
         </View>
       </ScrollView>
@@ -301,7 +320,7 @@ export default function CartScreen() {
           disabled={loading}
         >
           <Text style={styles.checkoutBtnText}>
-            {loading ? 'Processing...' : `Proceed to Pay ${ProductService.formatPrice(getTotal())}`}
+            {loading ? 'Processing...' : `Proceed to Pay ${ProductService.formatPrice(getGrandTotal())}`}
           </Text>
           {!loading && <ChevronRight size={20} color="#FFFFFF" />}
         </TouchableOpacity>

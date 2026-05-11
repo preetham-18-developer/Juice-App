@@ -8,7 +8,8 @@ import { supabase } from '../../lib/supabase';
 import { useLocalSearchParams } from 'expo-router';
 
 // The live Vercel URL
-const BASE_DASHBOARD_URL = 'https://admin-dashboard-juice.vercel.app';
+// For local development, use your machine's IP (e.g., http://192.168.1.x:3000) or localhost for web
+const BASE_DASHBOARD_URL = Platform.OS === 'web' ? 'http://localhost:3000' : 'http://10.0.2.2:3000'; // 10.0.2.2 is Android emulator for localhost
 const FALLBACK_DASHBOARD_URL = `${BASE_DASHBOARD_URL}/admin/login`;
 
 export default function AdminBridge() {
@@ -51,6 +52,18 @@ export default function AdminBridge() {
     }
   };
 
+  // Web redirect handler
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && sessionUrl !== FALLBACK_DASHBOARD_URL) {
+      setLoading(true);
+      // Small delay to show the connection message
+      const timer = setTimeout(() => {
+        window.location.href = sessionUrl;
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionUrl]);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Mini Header for Navigation Control */}
@@ -72,39 +85,40 @@ export default function AdminBridge() {
 
       <View style={styles.webviewContainer}>
         {Platform.OS === 'web' ? (
-          /* WEB-FRIENDLY IFRAME */
-          <iframe 
-            src={sessionUrl}
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              border: 'none',
-              borderRadius: 0
-            }}
-            onLoad={() => setLoading(false)}
-          />
-        ) : (
-          /* MOBILE-NATIVE WEBVIEW */
-          <WebView
-            ref={webViewRef}
-            source={{ uri: sessionUrl }}
-            style={styles.webview}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            scalesPageToFit={true}
-            allowsFullscreenVideo={true}
-            allowsInlineMediaPlayback={true}
-          />
-        )}
-        
-        {loading && (
+          /* WEB-FRIENDLY REDIRECT OVERLAY */
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color={COLORS.primaryGreen} />
-            <Text style={styles.loadingText}>Connecting to Premium Dashboard...</Text>
+            <Text style={styles.loadingText}>Redirecting to Secure Admin Dashboard...</Text>
+            <TouchableOpacity 
+              onPress={() => window.location.href = sessionUrl}
+              style={{ marginTop: 20, padding: 10 }}
+            >
+              <Text style={{ color: COLORS.primaryGreen, fontWeight: '700' }}>Click here if not redirected</Text>
+            </TouchableOpacity>
           </View>
+        ) : (
+          /* MOBILE-NATIVE WEBVIEW */
+          <>
+            <WebView
+              ref={webViewRef}
+              source={{ uri: sessionUrl }}
+              style={styles.webview}
+              onLoadStart={() => setLoading(true)}
+              onLoadEnd={() => setLoading(false)}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              scalesPageToFit={true}
+              allowsFullscreenVideo={true}
+              allowsInlineMediaPlayback={true}
+            />
+            {loading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color={COLORS.primaryGreen} />
+                <Text style={styles.loadingText}>Connecting to Premium Dashboard...</Text>
+              </View>
+            )}
+          </>
         )}
       </View>
     </SafeAreaView>

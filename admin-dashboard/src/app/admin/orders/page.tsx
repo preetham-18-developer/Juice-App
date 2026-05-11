@@ -16,12 +16,16 @@ import {
   Loader2,
   CheckCircle2,
   Truck,
-  Package
+  Package,
+  XCircle
 } from 'lucide-react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { useRealtime } from '@/hooks/useRealtime';
+import Skeleton from '@/components/ui/Skeleton';
 
 const orderStatuses = [
   { label: 'All', value: 'all' },
@@ -38,25 +42,21 @@ const OrdersPage = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [displayLimit, setDisplayLimit] = useState(10);
 
   useEffect(() => {
     fetchOrders();
-
-    // Subscribe to real-time changes
-    const channel = supabase
-      .channel('public:orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrders();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
-  const fetchOrders = async () => {
+  // REALTIME AUTO-REFRESH
+  useRealtime([
+    { table: 'orders', callback: () => fetchOrders(true) }
+  ]);
+
+  const fetchOrders = async (isBackground = false) => {
     try {
+      if (!isBackground) setLoading(true);
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -93,9 +93,19 @@ const OrdersPage = () => {
         .eq('id', orderId);
 
       if (error) throw error;
+      toast({
+        title: "Order Updated",
+        description: `Order status changed to ${nextStatus.toUpperCase()}`,
+        variant: "success",
+      });
       fetchOrders();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating status:', err);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update order status. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setUpdatingId(null);
     }
@@ -109,6 +119,8 @@ const OrdersPage = () => {
       order.profiles?.full_name?.toLowerCase().includes(searchLower);
     return matchesTab && matchesSearch;
   });
+
+  const displayedOrders = filteredOrders.slice(0, displayLimit);
 
   const OrderCardMobile = ({ order }: { order: any }) => (
     <motion.div 
@@ -140,7 +152,7 @@ const OrdersPage = () => {
       <div className="flex items-center gap-4 py-4 border-y border-slate-100 dark:border-slate-800">
         <div className="flex-1">
           <p className="text-xs font-bold text-slate-600 dark:text-slate-400">Total Amount</p>
-          <p className="text-lg font-black text-slate-900 dark:text-white">₹{order.total_price}</p>
+          <p className="text-lg font-black text-slate-900 dark:text-white">₹{order.total_amount}</p>
           <p className={cn(
             "text-[10px] font-bold uppercase tracking-tight flex items-center gap-1 mt-1",
             order.payment_status === 'paid' ? "text-emerald-500" : "text-amber-500"
@@ -173,6 +185,7 @@ const OrdersPage = () => {
 
   return (
     <AdminLayout>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Orders</h1>
@@ -219,7 +232,7 @@ const OrdersPage = () => {
             placeholder="Search Order ID, Name..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-xl text-xs font-medium focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
           />
         </div>
         <button className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500">
@@ -228,9 +241,21 @@ const OrdersPage = () => {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="animate-spin text-primary mb-4" size={32} />
-          <p className="text-slate-500 font-bold">Loading Live Orders...</p>
+        <div className="space-y-6">
+          <div className="card-premium p-4 flex items-center gap-4">
+            <Skeleton className="h-10 flex-1 rounded-xl" />
+            <Skeleton className="h-10 w-10 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="card-premium p-6 space-y-4">
+                <div className="flex justify-between"><Skeleton className="h-4 w-24" /><Skeleton className="h-6 w-16 rounded-xl" /></div>
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-4 w-1/3" />
+                <div className="flex gap-2 pt-4"><Skeleton className="h-10 flex-1 rounded-xl" /><Skeleton className="h-10 flex-[2] rounded-xl" /></div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <>
@@ -247,8 +272,8 @@ const OrdersPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredOrders.map((order) => (
-                  <tr key={order.id} className="group hover:bg-slate-50/30 transition-all">
+                {displayedOrders.map((order) => (
+                  <tr key={order.id} className="group hover:bg-slate-50/30 transition-all will-change-transform">
                     <td className="px-6 py-4">
                       <span className="font-black text-slate-800 dark:text-white">#{order.id.slice(0, 8).toUpperCase()}</span>
                       <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
@@ -260,7 +285,7 @@ const OrdersPage = () => {
                       <p className="text-xs text-slate-500">{order.profiles?.phone || 'No phone'}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="font-black text-slate-900 dark:text-white">₹{order.total_price}</p>
+                      <p className="font-black text-slate-900 dark:text-white">₹{order.total_amount}</p>
                       <p className={cn(
                         "text-[10px] font-black tracking-tight uppercase",
                         order.payment_status === 'paid' ? "text-emerald-500" : "text-amber-500"
@@ -291,11 +316,22 @@ const OrdersPage = () => {
 
           {/* Mobile Card View */}
           <div className="lg:hidden">
-            {filteredOrders.length > 0 ? (
-              filteredOrders.map(order => <OrderCardMobile key={order.id} order={order} />)
+            {displayedOrders.length > 0 ? (
+              displayedOrders.map(order => <OrderCardMobile key={order.id} order={order} />)
             ) : (
               <div className="text-center py-20">
                 <p className="text-slate-500 font-bold">No orders found.</p>
+              </div>
+            )}
+
+            {displayLimit < filteredOrders.length && (
+              <div className="flex justify-center mt-6">
+                <button 
+                  onClick={() => setDisplayLimit(prev => prev + 10)}
+                  className="px-8 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-black text-xs hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
+                >
+                  Load More Orders
+                </button>
               </div>
             )}
           </div>

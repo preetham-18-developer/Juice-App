@@ -32,13 +32,12 @@ interface SidebarProps {
 
 const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, href: '/admin/analytics' },
-  { name: 'Live Orders', icon: ShoppingCart, href: '/admin/orders', badge: '5' },
+  { name: 'Live Orders', icon: ShoppingCart, href: '/admin/orders' },
   { name: 'Products', icon: Package, href: '/admin/products' },
   { name: 'Inventory', icon: Layers, href: '/admin/inventory' },
   { name: 'Categories', icon: Layers, href: '/admin/categories' },
   { name: 'Customers', icon: Users, href: '/admin/customers' },
   { name: 'Analytics', icon: PieChart, href: '/admin/analytics' },
-  { name: 'Delivery Settings', icon: Truck, href: '/admin/settings/delivery' },
   { name: 'Settings', icon: Settings, href: '/admin/settings' },
 ];
 
@@ -52,14 +51,12 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isOpenMobile, setIsOpenMobile }:
     router.push('/admin/login');
   };
 
-  const dynamicMenuItems = [
-    ...menuItems.filter(item => item.name !== 'Delivery Settings'),
-    { 
-      name: 'Delivery Settings', 
-      icon: Truck, 
-      href: currentStore ? `/admin/store/${currentStore.id}/settings/delivery` : '/admin/settings/delivery' 
+  const dynamicMenuItems = menuItems.map(item => {
+    if (item.name === 'Dashboard' && currentStore) {
+      return { ...item, href: `/admin/store/${currentStore.id}/dashboard` };
     }
-  ];
+    return item;
+  });
 
   const sidebarContent = (
     <div className="h-full flex flex-col">
@@ -92,7 +89,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isOpenMobile, setIsOpenMobile }:
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto custom-scrollbar">
         {dynamicMenuItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== '/admin/analytics' && pathname.startsWith(item.href));
           return (
             <Link 
               key={item.name} 

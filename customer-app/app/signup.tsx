@@ -28,20 +28,52 @@ export default function SignupScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [signupDone, setSignupDone] = useState(false);
   const router = useRouter();
   const toastRef = React.useRef<ToastHandle>(null);
 
+  const validate = (field: string, value: string) => {
+    switch (field) {
+      case 'name':
+        if (!value.trim()) return "Please enter your name";
+        return null;
+      case 'email':
+        if (!value.trim()) return "Please enter your email";
+        if (!/\S+@\S+\.\S+/.test(value)) return "Please enter a valid email address";
+        return null;
+      case 'phone':
+        if (!value.trim()) return "Please enter your phone number";
+        if (value.length < 10) return "Please enter a valid phone number";
+        return null;
+      case 'password':
+        if (!value) return "Please enter your password";
+        if (value.length < 6) return "Password must be at least 6 characters";
+        return null;
+      case 'confirmPassword':
+        if (value !== password) return "Passwords do not match";
+        return null;
+      default:
+        return null;
+    }
+  };
+
   const handleSignup = async () => {
-    if (!name.trim() || !email.trim() || !phone.trim() || !password || !confirmPassword) {
-      return toastRef.current?.show('Please fill in all fields.', 'error');
-    }
-    if (password !== confirmPassword) {
-      return toastRef.current?.show('Passwords do not match.', 'error');
-    }
-    if (password.length < 6) {
-      return toastRef.current?.show('Password must be at least 6 chars.', 'error');
+    const newErrors = {
+      name: validate('name', name),
+      email: validate('email', email),
+      phone: validate('phone', phone),
+      password: validate('password', password),
+      confirmPassword: validate('confirmPassword', confirmPassword),
+    };
+
+    setErrors(newErrors);
+    setTouched({ name: true, email: true, phone: true, password: true, confirmPassword: true });
+
+    if (Object.values(newErrors).some(err => err !== null)) {
+      return;
     }
 
     setLoading(true);
@@ -156,54 +188,89 @@ export default function SignupScreen() {
           </View>
 
           <View style={styles.form}>
-            <Field label="Full Name" icon={<User size={20} color="#94a3b8" />}>
+            <Field label="Full Name" touched={touched.name} error={touched.name ? errors.name : null} icon={<User size={20} color={touched.name && errors.name ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Preetham Goud"
                 value={name}
-                onChangeText={setName}
+                onChangeText={(val) => {
+                  setName(val);
+                  if (touched.name) setErrors(prev => ({ ...prev, name: validate('name', val) }));
+                }}
+                onBlur={() => {
+                  setTouched(prev => ({ ...prev, name: true }));
+                  setErrors(prev => ({ ...prev, name: validate('name', name) }));
+                }}
                 autoCapitalize="words"
               />
             </Field>
 
-            <Field label="Email Address" icon={<Mail size={20} color="#94a3b8" />}>
+            <Field label="Email Address" touched={touched.email} error={touched.email ? errors.email : null} icon={<Mail size={20} color={touched.email && errors.email ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="you@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(val) => {
+                  setEmail(val);
+                  if (touched.email) setErrors(prev => ({ ...prev, email: validate('email', val) }));
+                }}
+                onBlur={() => {
+                  setTouched(prev => ({ ...prev, email: true }));
+                  setErrors(prev => ({ ...prev, email: validate('email', email) }));
+                }}
               />
             </Field>
 
-            <Field label="Phone Number" icon={<Phone size={20} color="#94a3b8" />}>
+            <Field label="Phone Number" touched={touched.phone} error={touched.phone ? errors.phone : null} icon={<Phone size={20} color={touched.phone && errors.phone ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="9876543210"
                 keyboardType="phone-pad"
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(val) => {
+                  setPhone(val);
+                  if (touched.phone) setErrors(prev => ({ ...prev, phone: validate('phone', val) }));
+                }}
+                onBlur={() => {
+                  setTouched(prev => ({ ...prev, phone: true }));
+                  setErrors(prev => ({ ...prev, phone: validate('phone', phone) }));
+                }}
               />
             </Field>
 
-            <Field label="Password" icon={<ShieldCheck size={20} color="#94a3b8" />}>
+            <Field label="Password" touched={touched.password} error={touched.password ? errors.password : null} icon={<ShieldCheck size={20} color={touched.password && errors.password ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="Min. 6 characters"
                 secureTextEntry
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(val) => {
+                  setPassword(val);
+                  if (touched.password) setErrors(prev => ({ ...prev, password: validate('password', val) }));
+                }}
+                onBlur={() => {
+                  setTouched(prev => ({ ...prev, password: true }));
+                  setErrors(prev => ({ ...prev, password: validate('password', password) }));
+                }}
               />
             </Field>
 
-            <Field label="Confirm Password" icon={<ShieldCheck size={20} color="#94a3b8" />}>
+            <Field label="Confirm Password" touched={touched.confirmPassword} error={touched.confirmPassword ? errors.confirmPassword : null} icon={<ShieldCheck size={20} color={touched.confirmPassword && errors.confirmPassword ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="Re-enter password"
                 secureTextEntry
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(val) => {
+                  setConfirmPassword(val);
+                  if (touched.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: validate('confirmPassword', val) }));
+                }}
+                onBlur={() => {
+                  setTouched(prev => ({ ...prev, confirmPassword: true }));
+                  setErrors(prev => ({ ...prev, confirmPassword: validate('confirmPassword', confirmPassword) }));
+                }}
               />
             </Field>
 
@@ -213,7 +280,10 @@ export default function SignupScreen() {
               onPress={handleSignup}
               disabled={loading}
             >
-              <LinearGradient colors={['#FF9900', '#FF6600']} style={styles.signupBtn}>
+              <LinearGradient 
+                colors={loading || Object.values(errors).some(err => err !== null) && Object.keys(touched).length > 0 ? ['#d1d5db', '#9ca3af'] : ['#FF9900', '#FF6600']} 
+                style={styles.signupBtn}
+              >
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
@@ -239,13 +309,29 @@ export default function SignupScreen() {
 }
 
 // ── Small helper component ────────────────────────────────────────────────────
-function Field({ label, icon, children }: { label: string; icon: any; children: any }) {
+function Field({ label, icon, error, children, touched }: { label: string; icon: any; error?: string | null; children: any; touched?: boolean }) {
   return (
     <View style={styles.inputGroup}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputContainer}>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>{label}</Text>
+        {touched && error && (
+          <Animated.View entering={FadeInUp} style={styles.errorContainer}>
+            <Text style={styles.errorTextSmall}>{error}</Text>
+          </Animated.View>
+        )}
+      </View>
+      <View style={[
+        styles.inputContainer,
+        touched && error && styles.inputError,
+        touched && !error && styles.inputSuccess
+      ]}>
         {icon}
         {children}
+        {touched && !error && (
+          <Animated.View entering={ZoomIn}>
+            <CheckCircle size={18} color={COLORS.primaryGreen} />
+          </Animated.View>
+        )}
       </View>
     </View>
   );
@@ -277,29 +363,14 @@ const styles = StyleSheet.create({
   form: { padding: 28, marginTop: 8 },
 
   inputGroup: { marginBottom: 18 },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#374151',
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 15,
-    marginLeft: 12,
-    fontSize: 15,
-    color: '#1e293b',
-  },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  label: { fontSize: 13, fontWeight: '700', color: '#374151' },
+  errorTextSmall: { fontSize: 11, color: '#ef4444', fontWeight: '700' },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 16, paddingHorizontal: 16, borderWidth: 1.5, borderColor: '#e2e8f0' },
+  inputError: { borderColor: '#ef4444', backgroundColor: '#fff1f2' },
+  inputSuccess: { borderColor: COLORS.primaryGreen, backgroundColor: '#f0fdf4' },
+  errorContainer: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  input: { flex: 1, paddingVertical: 15, marginLeft: 12, fontSize: 15, color: '#1e293b' },
 
   signupBtnContainer: {
     marginTop: 24,

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, 
   Upload, 
@@ -14,7 +14,9 @@ import {
   Image as ImageIcon,
   Plus,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  XCircle,
+  X
 } from 'lucide-react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
@@ -38,6 +40,7 @@ const AddProductPage = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const calculateDiscount = () => {
     if (!sellingPrice || !mrp) return 0;
@@ -75,20 +78,41 @@ const AddProductPage = () => {
       if (insertError) throw insertError;
 
       setSuccess(true);
+      setToast({ message: 'Product published successfully!', type: 'success' });
       setTimeout(() => {
         router.push('/admin/products');
-      }, 1500);
+      }, 2000);
 
     } catch (err: any) {
       console.error('Error publishing product:', err);
       setError(err.message || 'Something went wrong while saving the product.');
+      setToast({ message: 'Failed to publish product', type: 'error' });
     } finally {
       setLoading(false);
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
   return (
     <AdminLayout>
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={cn(
+              "fixed top-6 right-6 z-50 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm",
+              toast.type === 'success' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+            )}
+          >
+            {toast.type === 'success' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
@@ -144,7 +168,7 @@ const AddProductPage = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Fresh Alphanso Mango Juice"
-                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-bold text-sm lg:text-base"
+                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-2xl focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all font-medium text-sm lg:text-base"
                 />
               </div>
               <div className="space-y-2">
@@ -178,8 +202,8 @@ const AddProductPage = () => {
                     value={stock}
                     onChange={(e) => setStock(e.target.value)}
                     placeholder="100" 
-                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-bold text-sm" 
-                  />
+                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-2xl focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all font-medium text-sm" 
+            />
                 </div>
               </div>
             </div>
@@ -201,8 +225,8 @@ const AddProductPage = () => {
                   type="number" 
                   value={mrp}
                   onChange={(e) => setMrp(e.target.value)}
-                  className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none font-black text-sm"
-                />
+                  className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-2xl focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none font-medium text-sm"
+          />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Selling Price (₹)*</label>
@@ -210,8 +234,8 @@ const AddProductPage = () => {
                   type="number" 
                   value={sellingPrice}
                   onChange={(e) => setSellingPrice(e.target.value)}
-                  className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none font-black text-sm text-primary"
-                />
+                  className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-2xl focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none font-medium text-sm text-primary"
+          />
               </div>
               <div className="col-span-2 lg:col-span-1 space-y-2">
                 <label className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Live Discount</label>

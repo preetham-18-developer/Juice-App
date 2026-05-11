@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/useStore';
+import Skeleton from '@/components/ui/Skeleton';
 
 interface StoreData {
   id: string;
@@ -33,9 +34,16 @@ const StoresPage = () => {
   }, []);
 
   const fetchStores = async () => {
-    const { data, error } = await supabase.from('stores').select('*');
-    if (!error && data) setStores(data);
-    setLoading(false);
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.from('stores').select('*');
+      if (!error && data) setStores(data);
+    } catch (err) {
+      console.error('Error fetching stores:', err);
+    } finally {
+      // Small delay for smooth entry
+      setTimeout(() => setLoading(false), 200);
+    }
   };
 
   const handleSelectStore = (store: StoreData) => {
@@ -66,7 +74,7 @@ const StoresPage = () => {
             <input 
               type="text" 
               placeholder="Search by city or branch..." 
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-2xl text-sm font-medium focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
             />
           </div>
           <button className="p-3 bg-primary text-white rounded-xl shadow-lg shadow-primary/20">
@@ -77,13 +85,14 @@ const StoresPage = () => {
         {/* Store Grid - Mobile List */}
         <div className="grid grid-cols-1 gap-4 lg:gap-6">
           {loading ? (
-            [1, 2].map(i => (
-              <div key={i} className="card-premium p-6 animate-pulse flex items-center gap-4">
-                <div className="w-14 h-14 bg-slate-200 rounded-2xl" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-slate-200 rounded w-1/3" />
-                  <div className="h-3 bg-slate-100 rounded w-1/4" />
+            [1, 2, 3].map(i => (
+              <div key={i} className="card-premium p-6 flex items-center gap-6">
+                <Skeleton className="w-16 h-16 rounded-[1.5rem]" />
+                <div className="flex-1 space-y-3">
+                  <Skeleton className="h-6 w-1/3" />
+                  <Skeleton className="h-4 w-1/2" />
                 </div>
+                <Skeleton className="w-12 h-12 rounded-2xl" />
               </div>
             ))
           ) : stores.map((store) => (

@@ -27,16 +27,21 @@ interface CartStore {
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
+  deliveryFee: number;
+  updateDeliveryFee: (lat: number, lng: number) => Promise<number>;
   getTotal: () => number;
+  getGrandTotal: () => number;
   placeOrder: (userId: string, address: string, paymentType: 'online' | 'cod', initialStatus?: string, locationData?: Partial<StructuredAddress>) => Promise<string | null>;
 }
 
-import { StructuredAddress } from '../services/LocationService';
+import { StructuredAddress, LocationService } from '../services/LocationService';
+import { STORE_CONFIG } from '../constants/storeConfig';
 
 export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
       items: [],
+      deliveryFee: 0,
       addItem: (product, variant, quantity = 1) => {
         monitor.log('INFO', 'Cart', `Adding item: ${product.name}`, { productId: product.id });
         const isJuice = product.category === 'juice';
@@ -89,8 +94,53 @@ export const useCartStore = create<CartStore>()(
             : item
         )
       })),
-      clearCart: () => set({ items: [] }),
+      clearCart: () => set({ items: [], deliveryFee: 0 }),
       getTotal: () => get().items.reduce((acc, item) => acc + item.subtotal, 0),
+      getGrandTotal: () => get().getTotal() + get().deliveryFee,
+      updateDeliveryFee: async (lat, lng) => {
+        try {
+          // 1. Calculate distance from store
+          const distance = LocationService.calculateDistance(
+            STORE_CONFIG.latitude, 
+            STORE_CONFIG.longitude, 
+            lat, 
+            lng
+          );
+
+          // 2. Fetch active delivery configs
+          const { data: config, error } = await supabase
+            .from('delivery_fee_configs')
+            .select('*')
+            .eq('is_enabled', true)
+            .limit(1)
+            .single();
+
+          if (error || !config) {
+            set({ deliveryFee: 0 });
+            return 0;
+          }
+
+          // 3. Apply fee logic based on distance
+          let fee = 0;
+          if (distance <= config.zone1_limit_km) {
+            fee = config.zone1_fee;
+          } else if (distance <= config.zone2_limit_km) {
+            fee = config.zone2_fee;
+          } else if (distance <= config.max_delivery_km) {
+            fee = config.zone2_fee; // Fallback to zone 2 or handle custom max fee
+          } else {
+            // Beyond max delivery
+            throw new Error(`Location is too far for delivery (${distance}km). Max range is ${config.max_delivery_km}km.`);
+          }
+
+          set({ deliveryFee: fee });
+          return fee;
+        } catch (err: any) {
+          console.warn('[CartStore] Delivery calculation failed:', err.message);
+          set({ deliveryFee: 0 });
+          throw err;
+        }
+      },
       placeOrder: async (userId, address, paymentType, initialStatus = 'received', locationData) => {
         return await monitor.trackPerformance('PlaceOrder', async () => {
           const { items, getTotal } = get();
@@ -108,7 +158,7 @@ export const useCartStore = create<CartStore>()(
             const { data, error } = await supabase.rpc('place_order_v1', {
               p_user_id: userId,
               p_address: address,
-              p_total_amount: getTotal(),
+              p_total_amount: get().getGrandTotal(), // Use grand total including fee
               p_payment_type: paymentType,
               p_items: rpcItems,
               p_initial_status: initialStatus,
@@ -117,7 +167,8 @@ export const useCartStore = create<CartStore>()(
               p_formatted_address: locationData?.formattedAddress,
               p_city: locationData?.city,
               p_postal_code: locationData?.postalCode,
-              p_landmark: locationData?.landmark
+              p_landmark: locationData?.landmark,
+              p_delivery_fee: get().deliveryFee // Pass the fee
             });
 
             if (error) throw error;

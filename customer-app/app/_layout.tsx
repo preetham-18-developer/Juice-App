@@ -28,6 +28,8 @@ import { ThemeProvider } from '../src/store/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { IntroSequence } from '../src/components/ui/IntroSequence';
 import { Platform, View, StyleSheet } from 'react-native';
+import { Toast, ToastHandle } from '../src/components/ui/Toast';
+import { useRef } from 'react';
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -52,6 +54,7 @@ export default function RootLayout() {
   });
   const segments = useSegments();
   const router = useRouter();
+  const toastRef = useRef<ToastHandle>(null);
 
   const [fontsLoaded, fontError] = useFonts({
     Outfit_400Regular,
@@ -125,9 +128,41 @@ export default function RootLayout() {
         setUserRole(null);
       }
     });
+    // GLOBAL CUSTOMER NOTIFICATIONS
+    let orderChannel: any;
+
+    async function setupGlobalNotifications() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      orderChannel = supabase
+        .channel(`global_customer_orders_${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'orders',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const newStatus = payload.new.status;
+            const oldStatus = payload.old.status;
+            
+            if (newStatus !== oldStatus) {
+              console.log(`[Notification] Order status updated to: ${newStatus}`);
+              toastRef.current?.show(`Order Status Update: Your order is now ${newStatus.toUpperCase()}! 🥤`, 'info');
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    setupGlobalNotifications();
 
     return () => {
       subscription.unsubscribe();
+      if (orderChannel) supabase.removeChannel(orderChannel);
     };
   }, []);
 
@@ -143,7 +178,7 @@ export default function RootLayout() {
         router.replace('/signup');
       }
     } else if (userRole) {
-      if (userRole === 'admin') {
+      if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'store_admin') {
         if (segments[0] !== 'admin') {
           console.log("[Auth] Admin detected, redirecting to /admin");
           router.replace('/admin');
@@ -189,6 +224,7 @@ export default function RootLayout() {
                 <Stack.Screen name="index" options={{ headerShown: false }} />
                 <Stack.Screen name="login" options={{ headerShown: false }} />
                 <Stack.Screen name="signup" options={{ headerShown: false }} />
+                <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="admin" options={{ headerShown: false }} />
                 <Stack.Screen name="payment" options={{ title: 'Secure Payment' }} />
@@ -196,6 +232,7 @@ export default function RootLayout() {
                 <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
                 <Stack.Screen name="orders/[id]" options={{ title: 'Order Details' }} />
               </Stack>
+              <Toast ref={toastRef} />
               {Platform.OS === 'web' && showWebIntro && (
                 <View style={[StyleSheet.absoluteFill, { zIndex: 99999, backgroundColor: 'black' }]}>
                   <IntroSequence onComplete={() => setShowWebIntro(false)} />

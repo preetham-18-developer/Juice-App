@@ -21,10 +21,42 @@ export default function OrdersScreen() {
 
   useEffect(() => {
     fetchOrders();
+
+    // ── Realtime subscription ───────────────────────────────────────────
+    let channel: any;
+    
+    async function setupSubscription() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      channel = supabase
+        .channel(`public_orders_user_${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            console.log("[Realtime] Orders changed, refetching...");
+            fetchOrders(true);
+          }
+        )
+        .subscribe();
+    }
+
+    setupSubscription();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
-  async function fetchOrders() {
+  async function fetchOrders(isBackground = false) {
     try {
+      if (!isBackground) setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setLoading(false);

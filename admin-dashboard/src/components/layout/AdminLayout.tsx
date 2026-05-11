@@ -13,10 +13,14 @@ import {
   ChevronDown,
   Store,
   Moon,
-  Sun
+  Sun,
+  Zap
 } from 'lucide-react';
 import { useAppStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
+import Skeleton from '@/components/ui/Skeleton';
+import { Toaster } from '@/components/ui/Toaster';
+import { toast } from '@/hooks/use-toast';
 
 const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
@@ -42,7 +46,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
           .eq('id', session.user.id)
           .single();
 
-        if (error || !profile || (profile.role !== 'super_admin' && profile.role !== 'store_admin')) {
+        if (error || !profile || (profile.role !== 'super_admin' && profile.role !== 'store_admin' && profile.role !== 'admin')) {
           console.error("Access denied: Not an admin");
           await supabase.auth.signOut();
           router.push('/admin/login?error=unauthorized');
@@ -56,32 +60,50 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
       } catch (err) {
         console.error("Auth Guard error:", err);
       } finally {
-        setAuthLoading(false);
+        // Delay slightly for smooth transition
+        setTimeout(() => setAuthLoading(false), 100);
       }
     };
 
     checkAuth();
+
+    // GLOBAL REALTIME NOTIFICATIONS
+    const orderChannel = supabase
+      .channel('global-order-notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          console.log("[Realtime] New order received:", payload.new);
+          toast({
+            title: "🚀 New Order Received!",
+            description: `A new order (#${payload.new.id.slice(0, 8)}) has been placed for ₹${payload.new.total_amount}.`,
+            variant: "success",
+          });
+          
+          // Play a subtle sound if possible or other feedback
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(orderChannel);
+    };
   }, [router]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-500 font-bold animate-pulse">Verifying Admin Access...</p>
-        </div>
-      </div>
-    );
-  }
+  // Memoized Sidebar and Navbar to prevent unnecessary re-renders
+  const memoizedSidebar = React.useMemo(() => (
+    <Sidebar 
+      isCollapsed={isCollapsed} 
+      setIsCollapsed={setIsCollapsed} 
+      isOpenMobile={isOpenMobile}
+      setIsOpenMobile={setIsOpenMobile}
+    />
+  ), [isCollapsed, isOpenMobile]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex font-sans">
-      <Sidebar 
-        isCollapsed={isCollapsed} 
-        setIsCollapsed={setIsCollapsed} 
-        isOpenMobile={isOpenMobile}
-        setIsOpenMobile={setIsOpenMobile}
-      />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex font-sans selection:bg-primary/10">
+      {memoizedSidebar}
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Navbar */}
@@ -127,16 +149,29 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
               <div className="h-8 w-[1px] bg-slate-100 dark:bg-slate-800 mx-1 hidden sm:block" />
 
               <button className="flex items-center gap-2 p-1.5 lg:p-2 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-sm hover:shadow-md transition-all">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-emerald-500 flex items-center justify-center text-white font-black text-xs">
-                  {userProfile?.name?.charAt(0) || 'A'}
-                </div>
-                <div className="hidden lg:block text-left">
-                  <p className="text-xs font-black text-slate-900 dark:text-white leading-tight truncate max-w-[120px]">
-                    {userProfile?.name}
-                  </p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                    {userProfile?.role === 'super_admin' ? 'Super Admin' : 'Store Admin'}
-                  </p>
+                {authLoading ? (
+                  <Skeleton className="w-8 h-8 rounded-xl" />
+                ) : (
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-emerald-500 flex items-center justify-center text-white font-black text-xs">
+                    {userProfile?.name?.charAt(0) || 'A'}
+                  </div>
+                )}
+                <div className="hidden lg:block text-left min-w-[80px]">
+                  {authLoading ? (
+                    <>
+                      <Skeleton className="h-3 w-20 mb-1" />
+                      <Skeleton className="h-2 w-12" />
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-black text-slate-900 dark:text-white leading-tight truncate max-w-[120px]">
+                        {userProfile?.name}
+                      </p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                        {userProfile?.role === 'super_admin' ? 'Super Admin' : userProfile?.role === 'admin' ? 'System Admin' : 'Store Admin'}
+                      </p>
+                    </>
+                  )}
                 </div>
                 <ChevronDown size={14} className="text-slate-400 ml-1 hidden lg:block" />
               </button>
@@ -145,20 +180,24 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-10 scroll-smooth custom-scrollbar">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="mx-auto w-full max-w-[1600px]"
-          >
-            {children}
-          </motion.div>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-10 scroll-smooth custom-scrollbar will-change-scroll">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={authLoading ? 'loading' : 'content'}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="mx-auto w-full max-w-[1600px]"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
           
           {/* Mobile Bottom Spacer for Floating Actions */}
           <div className="h-20 lg:hidden" />
         </main>
       </div>
+      <Toaster />
     </div>
   );
 };

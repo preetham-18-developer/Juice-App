@@ -184,7 +184,7 @@ const DeliverySettingsPage = () => {
                     <select 
                       value={config.zone1_limit_km}
                       onChange={(e) => setConfig({...config, zone1_limit_km: Number(e.target.value)})}
-                      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl font-black text-slate-800 dark:text-white focus:ring-4 focus:ring-primary/10 outline-none"
+                      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border border-transparent rounded-2xl font-medium text-slate-800 dark:text-white focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
                     >
                       {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v} km</option>)}
                     </select>
@@ -196,7 +196,7 @@ const DeliverySettingsPage = () => {
                       <select 
                         value={config.zone1_fee}
                         onChange={(e) => setConfig({...config, zone1_fee: Number(e.target.value)})}
-                        className="w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl font-black text-slate-800 dark:text-white focus:ring-4 focus:ring-primary/10 outline-none appearance-none"
+                        className="w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-800 border border-transparent rounded-2xl font-medium text-slate-800 dark:text-white focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all appearance-none"
                       >
                         {[0, 10, 20, 30, 40, 50].map(v => <option key={v} value={v}>{v === 0 ? 'FREE' : `₹${v}`}</option>)}
                       </select>
@@ -221,7 +221,7 @@ const DeliverySettingsPage = () => {
                     <select 
                       value={config.zone2_limit_km}
                       onChange={(e) => setConfig({...config, zone2_limit_km: Number(e.target.value)})}
-                      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl font-black text-slate-800 dark:text-white focus:ring-4 focus:ring-primary/10 outline-none"
+                      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border border-transparent rounded-2xl font-medium text-slate-800 dark:text-white focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
                     >
                       {[2, 3, 4, 5, 6, 7, 8].map(v => (
                         <option key={v} value={v} disabled={v <= config.zone1_limit_km}>{v} km</option>
@@ -235,7 +235,7 @@ const DeliverySettingsPage = () => {
                       <select 
                         value={config.zone2_fee}
                         onChange={(e) => setConfig({...config, zone2_fee: Number(e.target.value)})}
-                        className="w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl font-black text-slate-800 dark:text-white focus:ring-4 focus:ring-primary/10 outline-none appearance-none"
+                        className="w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-800 border border-transparent rounded-2xl font-medium text-slate-800 dark:text-white focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all appearance-none"
                       >
                         {[0, 10, 20, 30, 40, 50, 60, 80].map(v => <option key={v} value={v}>{v === 0 ? 'FREE' : `₹${v}`}</option>)}
                       </select>

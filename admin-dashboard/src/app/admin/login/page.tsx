@@ -1,36 +1,47 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
+import { 
+  Lock, 
+  Mail, 
+  ArrowRight, 
+  Zap, 
+  ShieldCheck, 
+  AlertCircle,
+  Loader2
+} from 'lucide-react';
 
-const LoginPage = () => {
+const LoginContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [touched, setTouched] = useState({ email: false, password: false });
 
   useEffect(() => {
     const checkExistingSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Check role and redirect
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', session.user.id)
           .single();
 
-        if (profile?.role === 'super_admin' || profile?.role === 'store_admin') {
+        if (profile?.role === 'super_admin' || profile?.role === 'store_admin' || profile?.role === 'admin') {
           router.push('/admin/stores');
           return;
         }
       }
-      setLoading(false);
+      setCheckingSession(false);
     };
 
     const autoLogin = async () => {
@@ -58,6 +69,7 @@ const LoginPage = () => {
         } catch (err: any) {
           console.error('SSO Error:', err.message);
           setError('Automatic login failed. Please login manually.');
+          setCheckingSession(false);
           setLoading(false);
         }
       } else {
@@ -68,131 +80,218 @@ const LoginPage = () => {
     autoLogin();
   }, [searchParams, router]);
 
+  const validateEmail = (val: string) => {
+    if (!val) return "Please enter your email";
+    if (!/\S+@\S+\.\S+/.test(val)) return "Please enter a valid email address";
+    return null;
+  };
+
+  const validatePassword = (val: string) => {
+    if (!val) return "Please enter your password";
+    if (val.length < 6) return "Password must contain at least 6 characters";
+    return null;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const eErr = validateEmail(email);
+    const pErr = validatePassword(password);
+    
+    if (eErr || pErr) {
+      setEmailError(eErr);
+      setPasswordError(pErr);
+      setTouched({ email: true, password: true });
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (authError) throw authError;
+      if (loginError) throw loginError;
 
-      // Check if user is admin in profiles
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', data.user.id)
         .single();
 
-      if (profileError || profile.role !== 'admin') {
+      if (!profile || (profile.role !== 'super_admin' && profile.role !== 'store_admin' && profile.role !== 'admin')) {
         await supabase.auth.signOut();
-        throw new Error('Access denied. Admin privileges required.');
+        throw new Error('Access denied: Unauthorized role');
       }
 
       router.push('/admin/stores');
     } catch (err: any) {
-      setError(err.message);
-    } finally {
+      setError(err.message || 'Failed to login');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[url('https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=1600')] bg-cover bg-center flex items-center justify-center p-6">
-      <div className="absolute inset-0 bg-white/40 dark:bg-slate-950/60 backdrop-blur-sm" />
-      
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md glass p-10 rounded-[2.5rem] relative z-10"
+    <div className="flex flex-col items-center gap-8 w-full max-w-md">
+      <div className="text-center space-y-4">
+        <motion.div 
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-20 h-20 bg-primary rounded-[2.5rem] flex items-center justify-center mx-auto shadow-2xl shadow-primary/30"
+        >
+          <Zap size={40} className="text-white" fill="currentColor" />
+        </motion.div>
+        <div>
+          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">Juicy App</h1>
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Admin Intelligence Dashboard</p>
+        </div>
+      </div>
+
+      <motion.div 
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="w-full bg-white dark:bg-slate-900 p-8 lg:p-10 relative overflow-hidden rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800"
       >
-        <div className="text-center mb-10">
-          <motion.div
-            initial={{ y: -20 }}
-            animate={{ y: 0 }}
-            className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center shadow-xl shadow-primary/30 mx-auto mb-6"
-          >
-            <span className="text-white font-black text-4xl">J</span>
-          </motion.div>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Admin Dashboard</h1>
-          <p className="text-slate-500 font-medium">Welcome back! Please login to continue.</p>
+        <div className="absolute top-0 right-0 p-4 opacity-[0.03]">
+          <ShieldCheck size={120} />
         </div>
 
+        {error && (
+          <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm font-bold">
+            <AlertCircle size={18} />
+            <p>{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleLogin} className="space-y-6">
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-sm font-bold"
-            >
-              <AlertCircle size={18} />
-              {error}
-            </motion.div>
-          )}
-
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Admin Email</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
             <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={20} />
-              <input
-                type="email"
-                required
+              <Mail className={cn(
+                "absolute left-5 top-1/2 -translate-y-1/2 transition-colors",
+                emailError && touched.email ? "text-rose-500" : "text-slate-400 group-focus-within:text-primary"
+              )} size={18} />
+              <input 
+                type="email" 
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-medium"
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (touched.email) setEmailError(validateEmail(e.target.value));
+                }}
+                onBlur={() => {
+                  setTouched(prev => ({ ...prev, email: true }));
+                  setEmailError(validateEmail(email));
+                }}
                 placeholder="admin@juicyapp.com"
+                className={cn(
+                  "w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-800 border-2 rounded-2xl font-medium text-slate-800 dark:text-white outline-none transition-all",
+                  emailError && touched.email 
+                    ? "border-rose-500/50 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-900/10 focus:ring-rose-500/10" 
+                    : "border-transparent focus:ring-4 focus:ring-primary/10"
+                )}
               />
             </div>
+            <AnimatePresence>
+              {emailError && touched.email && (
+                <motion.p 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="text-rose-500 text-[10px] font-bold ml-1 flex items-center gap-1"
+                >
+                  <AlertCircle size={10} />
+                  {emailError}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Password</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Secure Password</label>
             <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={20} />
-              <input
-                type="password"
-                required
+              <Lock className={cn(
+                "absolute left-5 top-1/2 -translate-y-1/2 transition-colors",
+                passwordError && touched.password ? "text-rose-500" : "text-slate-400 group-focus-within:text-primary"
+              )} size={18} />
+              <input 
+                type="password" 
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all font-medium"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (touched.password) setPasswordError(validatePassword(e.target.value));
+                }}
+                onBlur={() => {
+                  setTouched(prev => ({ ...prev, password: true }));
+                  setPasswordError(validatePassword(password));
+                }}
                 placeholder="••••••••"
+                className={cn(
+                  "w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-800 border-2 rounded-2xl font-medium text-slate-800 dark:text-white outline-none transition-all",
+                  passwordError && touched.password 
+                    ? "border-rose-500/50 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-900/10 focus:ring-rose-500/10" 
+                    : "border-transparent focus:ring-4 focus:ring-primary/10"
+                )}
               />
             </div>
+            <AnimatePresence>
+              {passwordError && touched.password && (
+                <motion.p 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="text-rose-500 text-[10px] font-bold ml-1 flex items-center gap-1"
+                >
+                  <AlertCircle size={10} />
+                  {passwordError}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
-          <div className="flex items-center justify-between px-1">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 accent-primary rounded" />
-              <span className="text-sm font-bold text-slate-500">Remember me</span>
-            </label>
-            <button type="button" className="text-sm font-bold text-primary hover:underline">Forgot Password?</button>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            disabled={loading}
-            className="w-full py-4 bg-primary text-white rounded-2xl font-black text-lg shadow-xl shadow-primary/30 flex items-center justify-center gap-3 hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          <button 
+            type="submit"
+            disabled={loading || checkingSession}
+            className={cn(
+              "w-full py-5 rounded-[2rem] font-black shadow-xl transition-all flex items-center justify-center gap-3 active:scale-[0.98]",
+              loading || checkingSession
+                ? "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                : "bg-primary text-white shadow-primary/25 hover:scale-[1.02] hover:shadow-primary/40"
+            )}
           >
-            {loading ? (
-              <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
+            {loading || checkingSession ? (
+              <Loader2 className="animate-spin" size={20} />
             ) : (
               <>
-                <span>Login Securely</span>
-                <LogIn size={20} />
+                <span>Enter Dashboard</span>
+                <ArrowRight size={20} />
               </>
             )}
-          </motion.button>
+          </button>
         </form>
 
         <p className="text-center mt-10 text-slate-400 text-xs font-bold uppercase tracking-widest">
           Secured by Supabase & Juicy App Cloud
         </p>
       </motion.div>
+    </div>
+  );
+};
+
+const LoginPage = () => {
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 font-sans">
+      <Suspense fallback={
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin text-primary" size={32} />
+          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Initializing Auth...</p>
+        </div>
+      }>
+        <LoginContent />
+      </Suspense>
     </div>
   );
 };

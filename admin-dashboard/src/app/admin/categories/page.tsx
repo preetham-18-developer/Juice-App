@@ -11,11 +11,16 @@ import {
   Image as ImageIcon,
   MoreVertical,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  X,
+  Save,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { useRealtime } from '@/hooks/useRealtime';
 
 interface Category {
   id: string;
@@ -30,14 +35,27 @@ const CategoriesPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [formData, setFormData] = useState({ name: '', image_url: '', description: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     fetchCategories();
   }, []);
 
-  const fetchCategories = async () => {
+  // REALTIME AUTO-REFRESH
+  useRealtime([
+    { table: 'categories', callback: () => fetchCategories(true) },
+    { table: 'products', callback: () => fetchCategories(true) }
+  ]);
+
+  const fetchCategories = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       const { data, error: catError } = await supabase
         .from('categories')
         .select('*')
@@ -63,26 +81,110 @@ const CategoriesPage = () => {
       }));
 
       setCategories(formatted);
-      if (formatted.length > 0 && !selectedCategory) {
+      
+      // Update selected category if it exists in the new data
+      if (selectedCategory) {
+        const updated = formatted.find(c => c.id === selectedCategory.id);
+        if (updated) setSelectedCategory(updated);
+      } else if (formatted.length > 0) {
         setSelectedCategory(formatted[0]);
       }
     } catch (err: any) {
       console.error('Error:', err);
-      setError('Failed to load categories. Please ensure the "categories" table exists in your database.');
+      if (!isBackground) setError('Failed to load categories.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleOpenAddModal = () => {
+    setModalMode('add');
+    setFormData({ name: '', image_url: '', description: '' });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (cat: Category) => {
+    setModalMode('edit');
+    setFormData({ name: cat.name, image_url: cat.image_url, description: cat.description });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (modalMode === 'add') {
+        const { error: addError } = await supabase
+          .from('categories')
+          .insert([formData]);
+        if (addError) throw addError;
+        setToast({ message: 'Category added!', type: 'success' });
+      } else {
+        const { error: editError } = await supabase
+          .from('categories')
+          .update(formData)
+          .eq('id', selectedCategory?.id);
+        if (editError) throw editError;
+        setToast({ message: 'Category updated!', type: 'success' });
+      }
+      setIsModalOpen(false);
+      fetchCategories();
+    } catch (err: any) {
+      setToast({ message: err.message, type: 'error' });
+    } finally {
+      setSubmitting(false);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure? This will not delete products, but they will become uncategorized.')) return;
+    try {
+      const { error: delError } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+      if (delError) throw delError;
+      setToast({ message: 'Category removed', type: 'success' });
+      if (selectedCategory?.id === id) setSelectedCategory(null);
+      fetchCategories();
+    } catch (err: any) {
+      setToast({ message: err.message, type: 'error' });
+    } finally {
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
   return (
     <AdminLayout>
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={cn(
+              "fixed top-6 right-6 z-50 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm",
+              toast.type === 'success' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+            )}
+          >
+            {toast.type === 'success' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Categories</h1>
           <p className="text-slate-500 font-medium">Organize your products into logical groups</p>
         </div>
         
-        <button className="flex items-center gap-2 px-6 py-4 bg-primary text-white rounded-2xl font-black shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+        <button 
+          onClick={handleOpenAddModal}
+          className="flex items-center gap-2 px-6 py-4 bg-primary text-white rounded-2xl font-black shadow-xl shadow-primary/20 hover:scale-105 transition-all"
+        >
           <Plus size={20} />
           Add Category
         </button>
@@ -167,10 +269,16 @@ const CategoriesPage = () => {
                     </div>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <button className="flex-1 sm:flex-none p-3.5 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-500 hover:text-primary transition-all">
+                    <button 
+                      onClick={() => handleOpenEditModal(selectedCategory)}
+                      className="flex-1 sm:flex-none p-3.5 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-500 hover:text-primary transition-all"
+                    >
                       <Edit size={20} />
                     </button>
-                    <button className="flex-1 sm:flex-none p-3.5 bg-rose-50 rounded-2xl text-rose-500 hover:bg-rose-100 transition-all">
+                    <button 
+                      onClick={() => handleDelete(selectedCategory.id)}
+                      className="flex-1 sm:flex-none p-3.5 bg-rose-50 rounded-2xl text-rose-500 hover:bg-rose-100 transition-all"
+                    >
                       <Trash2 size={20} />
                     </button>
                   </div>
@@ -202,6 +310,80 @@ const CategoriesPage = () => {
           </AnimatePresence>
         </div>
       </div>
+      {/* Category Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                    {modalMode === 'add' ? 'New Category' : 'Edit Category'}
+                  </h2>
+                  <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400">
+                    <X size={20} />
+                  </button>
+                </div>
+                
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-2xl focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all font-medium"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Image URL</label>
+                    <input 
+                      type="text"
+                      value={formData.image_url}
+                      onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description</label>
+                    <textarea 
+                      rows={3}
+                      value={formData.description}
+                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium text-sm resize-none"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full py-4 bg-primary text-white rounded-2xl font-black shadow-xl shadow-primary/20 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {submitting ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                    {submitting ? 'Processing...' : modalMode === 'add' ? 'Create Category' : 'Update Category'}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </AdminLayout>
   );
 };
