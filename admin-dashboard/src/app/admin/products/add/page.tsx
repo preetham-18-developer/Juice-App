@@ -106,21 +106,21 @@ const AddProductPage = () => {
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest ml-1">MRP (₹)</label>
-                <input 
-                  type="number" 
-                  value={mrp}
-                  onChange={(e) => setMrp(e.target.value)}
-                  className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none font-black text-sm"
-                />
+                  <input 
+                    type="number" 
+                    value={mrp}
+                    onChange={(e) => setMrp(e.target.value)}
+                    className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none font-black text-sm"
+                  />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Selling (₹)</label>
-                <input 
-                  type="number" 
-                  value={sellingPrice}
-                  onChange={(e) => setSellingPrice(e.target.value)}
-                  className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none font-black text-sm text-primary"
-                />
+                  <input 
+                    type="number" 
+                    value={sellingPrice}
+                    onChange={(e) => setSellingPrice(e.target.value)}
+                    className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none font-black text-sm text-primary"
+                  />
               </div>
               <div className="col-span-2 lg:col-span-1 space-y-2">
                 <label className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Discount (%)</label>

@@ -137,11 +137,11 @@ const SettingsPage = () => {
                   <div className="space-y-6">
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Razorpay Key ID</label>
-                      <input type="password" value="rzp_test_Sn7EB9DtuuYSVJ" className="w-full px-5 py-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-mono text-sm" />
+                      <input type="password" defaultValue="rzp_test_Sn7EB9DtuuYSVJ" className="w-full px-5 py-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-mono text-sm" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Razorpay Key Secret</label>
-                      <input type="password" value="••••••••••••••••••••••••" className="w-full px-5 py-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-mono text-sm" />
+                      <input type="password" defaultValue="••••••••••••••••••••••••" className="w-full px-5 py-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-mono text-sm" />
                     </div>
                   </div>
                 </div>
