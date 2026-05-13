@@ -4,12 +4,6 @@ const nextConfig = {
   devIndicators: {
     buildActivity: false,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     remotePatterns: [
       {

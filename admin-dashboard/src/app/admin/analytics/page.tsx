@@ -80,10 +80,10 @@ const AnalyticsPage = () => {
         .order('created_at', { ascending: false });
       
       if (ordersError) throw ordersError;
-      const allOrders = orders as any[];
+      const allOrders = (orders as any[]) || [];
 
       // 2. Fetch Customer Count - More efficiently
-      const uniqueCustomers = new Set(allOrders?.map(o => o.user_id)).size || 0;
+      const uniqueCustomers = new Set(allOrders.map((o: any) => o.user_id)).size || 0;
 
       // 3. Fetch Top Products - Specific columns
       const { data: orderItems, error: itemsError } = await supabase
