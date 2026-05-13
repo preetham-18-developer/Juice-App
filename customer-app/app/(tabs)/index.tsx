@@ -340,8 +340,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignSelf: 'flex-start',
     marginBottom: 12,
-    backdropFilter: 'blur(4px)',
-  } as any,
+  },
   bannerBadgeText: {
     color: '#FFF',
     fontSize: 10,
