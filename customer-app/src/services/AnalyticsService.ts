@@ -58,11 +58,21 @@ class AnalyticsService {
       const totalOrders = orders.length;
       const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
+      // Calculate real conversion rate: (Successful Orders / Total Unique Sessions)
+      const { count: sessionCount, error: sessionError } = await supabase
+        .from('analytics_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_name', 'session_start');
+
+      const conversionRate = sessionCount && sessionCount > 0 
+        ? (totalOrders / sessionCount) * 100 
+        : 0;
+
       return {
         totalRevenue,
         totalOrders,
         avgOrderValue,
-        conversionRate: 2.4, // Mock for now
+        conversionRate: parseFloat(conversionRate.toFixed(2)),
       };
     } catch (err) {
       monitor.log('ERROR', 'Analytics', 'Failed to fetch KPIs', { err });

@@ -49,8 +49,14 @@ export default function HomeScreen() {
   const { category: paramCategory } = useLocalSearchParams<{ category: string }>();
   const addItem = useCartStore((state) => state.addItem);
   const toastRef = useRef<ToastHandle>(null);
-  const { products, loading, refreshing, error, hasMore, loadMore, refresh, retry } = useProducts();
   const [activeCategory, setActiveCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 400);
+
+  const { products, loading, refreshing, error, hasMore, loadMore, refresh, retry } = useProducts({
+    category: activeCategory,
+    search: debouncedSearch
+  });
   
   const featuredProducts = useMemo(() => {
     return products.slice(0, 5).map((p, idx) => ({
@@ -65,7 +71,7 @@ export default function HomeScreen() {
         "https://images.unsplash.com/photo-1613478223719-2ab802602423?q=80&w=800"
       ][idx % 5],
       category: p.category,
-      rating: 4.8 // Mock rating
+      rating: p.rating || 4.8 // Use real rating if available
     }));
   }, [products]);
 
@@ -83,8 +89,6 @@ export default function HomeScreen() {
     120,
     (Math.min(windowWidth, 1400) - (horizontalPadding * 2) - (gridGap * (numColumns - 1))) / numColumns
   );
-  const [searchQuery, setSearchQuery] = useState('');
-  const debouncedSearch = useDebounce(searchQuery, 400);
   
   // Filter states
   const [filterVisible, setFilterVisible] = useState(false);
@@ -96,18 +100,10 @@ export default function HomeScreen() {
   }, [loading]);
 
   const filteredProducts = useMemo(() => {
+    // Only sorting and price filtering remaining on client for instant UX
     let result = products.filter(p => {
-      const matchesCategory = activeCategory === 'all' || 
-                             p.category?.toLowerCase() === activeCategory.toLowerCase();
-      
-      const matchesSearch = !debouncedSearch || 
-                           p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                           p.description?.toLowerCase().includes(debouncedSearch.toLowerCase());
-                           
       const price = p.price || p.price_per_kg || 0;
-      const matchesPrice = price <= priceRange;
-
-      return matchesCategory && matchesSearch && matchesPrice;
+      return price <= priceRange;
     });
 
     if (selectedSort === 'price_low') {
@@ -115,16 +111,16 @@ export default function HomeScreen() {
     } else if (selectedSort === 'price_high') {
       result.sort((a, b) => (b.price || b.price_per_kg || 0) - (a.price || a.price_per_kg || 0));
     } else if (selectedSort === 'popular') {
-      // Mock popularity logic: Juices first, then by name
+      // Prioritize available and category-specific items
       result.sort((a, b) => {
-        if (a.category === 'juice' && b.category !== 'juice') return -1;
-        if (a.category !== 'juice' && b.category === 'juice') return 1;
-        return a.name.localeCompare(b.name);
+        if (a.is_available && !b.is_available) return -1;
+        if (!a.is_available && b.is_available) return 1;
+        return (b.rating || 0) - (a.rating || 0);
       });
     }
 
     return result;
-  }, [products, activeCategory, debouncedSearch, priceRange, selectedSort]);
+  }, [products, priceRange, selectedSort]);
 
   const handleAddToCart = useCallback((item: Product) => {
     addItem(item);

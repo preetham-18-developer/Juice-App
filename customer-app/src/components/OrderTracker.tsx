@@ -5,6 +5,9 @@ import {
   StyleSheet,
   Dimensions,
   Platform,
+  TouchableOpacity,
+  Alert,
+  Linking,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,

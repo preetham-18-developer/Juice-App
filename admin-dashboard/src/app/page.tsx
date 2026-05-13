@@ -23,11 +23,9 @@ export default function RootPage() {
 
       // STRICT LOGIC: ONLY the specific admin email gets to the dashboard
       if (userEmail === ADMIN_EMAIL) {
-        console.log("Admin identified, redirecting to dashboard...");
         router.replace('/admin/dashboard');
       } else {
         // Everyone else is a customer, period.
-        console.log("Customer identified, redirecting to customer app...");
         window.location.href = CUSTOMER_APP_URL;
       }
     };

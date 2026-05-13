@@ -13,22 +13,19 @@ export interface OrderTrackingState {
   isDelivered: boolean;
   isCancelled: boolean;
   isActive: boolean;
+  deliveryPartner: any | null;
 }
 
 /**
  * useOrderTracking — manages full order lifecycle state.
- *
- * Features:
- * - Initial data fetch
- * - Supabase realtime subscription (instant UI updates)
- * - TEST_MODE auto-progression (starts immediately when hook mounts)
- * - Stable cleanup on unmount
  */
 export function useOrderTracking(orderId: string): OrderTrackingState {
   const [currentStatus, setCurrentStatus] = useState<OrderStatus>('PENDING');
   const [trackingSteps, setTrackingSteps] = useState<TrackingStep[]>([]);
   const [estimatedDelivery, setEstimatedDelivery] = useState<string | null>(null);
   const [deliveryPartner, setDeliveryPartner] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const cleanupAutoProgressRef = useRef<(() => void) | null>(null);
 
   const applyStatus = useCallback((rawStatus: string, steps: TrackingStep[], eta: string | null, partner?: any) => {
     const normalized = normalizeStatus(rawStatus);
@@ -41,10 +38,11 @@ export function useOrderTracking(orderId: string): OrderTrackingState {
   // ── Initial fetch ────────────────────────────────────────────────────────
   const fetchInitial = useCallback(async () => {
     if (!orderId) return;
+    setLoading(true);
     try {
       const state = await OrderTrackingService.fetchTrackingState(orderId);
       if (state) {
-        applyStatus(state.status, state.steps, state.estimatedDelivery, state.deliveryPartner);
+        applyStatus(state.status, state.steps, state.estimatedDelivery, (state as any).deliveryPartner);
       }
     } catch (err) {
       console.error('[useOrderTracking] Fetch failed:', err);
@@ -69,9 +67,21 @@ export function useOrderTracking(orderId: string): OrderTrackingState {
           table: 'orders',
           filter: `id=eq.${orderId}`,
         },
-        (payload) => {
-          const { status, tracking_steps, estimated_delivery } = payload.new;
-          applyStatus(status, tracking_steps || [], estimated_delivery || null);
+        async (payload) => {
+          const { status, tracking_steps, estimated_delivery, delivery_partner_id } = payload.new;
+          
+          // If partner changed, we might need to fetch full partner details
+          let partner = deliveryPartner;
+          if (delivery_partner_id && (!deliveryPartner || deliveryPartner.id !== delivery_partner_id)) {
+             const { data } = await supabase
+               .from('delivery_partners')
+               .select('id, name, phone, vehicle_type, vehicle_number')
+               .eq('id', delivery_partner_id)
+               .single();
+             partner = data;
+          }
+
+          applyStatus(status, tracking_steps || [], estimated_delivery || null, partner);
         }
       )
       .subscribe();
@@ -88,7 +98,7 @@ export function useOrderTracking(orderId: string): OrderTrackingState {
       channel.unsubscribe();
       cleanupAutoProgressRef.current?.();
     };
-  }, [orderId, fetchInitial, applyStatus]);
+  }, [orderId, fetchInitial, applyStatus, deliveryPartner]);
 
   const currentStepIndex = getStepIndex(currentStatus);
   const totalSteps = ORDER_STATUS_FLOW.length - 1; // 0-indexed max

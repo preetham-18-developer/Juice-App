@@ -151,6 +151,7 @@ export const OrderTrackingService = {
     status: OrderStatus;
     steps: TrackingStep[];
     estimatedDelivery: string | null;
+    deliveryPartner: any | null;
   } | null> {
     try {
       const { data, error } = await supabase

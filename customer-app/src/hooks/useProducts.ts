@@ -6,21 +6,24 @@ import { ProductService } from '../services/ProductService';
 
 const PAGE_SIZE = 12;
 
-export const useProducts = () => {
+export const useProducts = (options?: { category?: string; search?: string }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const pageRef = useRef(0);
+  
+  const category = options?.category === 'all' ? undefined : options?.category;
+  const search = options?.search;
 
   const fetchProducts = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       pageRef.current = 0;
-      setHasMore(true);
+      // We don't return early here because we want to allow the refresh
+    } else if (!hasMore) {
+      return;
     }
-    
-    if (!hasMore && !isRefresh) return;
 
     try {
       if (isRefresh) setRefreshing(true);
@@ -32,13 +35,21 @@ export const useProducts = () => {
         const from = pageRef.current * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
-        const { data, error: supabaseError } = await safeQuery(() => 
-          supabase
-            .from('products')
-            .select('*')
-            .range(from, to)
-            .order('id', { ascending: true })
-        );
+        let query = supabase
+          .from('products')
+          .select('*')
+          .range(from, to)
+          .order('id', { ascending: true });
+
+        if (category) {
+          query = query.ilike('category', `%${category}%`);
+        }
+
+        if (search) {
+          query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+        }
+
+        const { data, error: supabaseError } = await safeQuery(() => query);
 
         if (supabaseError) throw supabaseError;
 
@@ -58,10 +69,10 @@ export const useProducts = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [hasMore]);
+  }, [hasMore, category, search]);
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(true); // Always refresh when filters change
 
     const channelId = `products-${Math.random().toString(36).slice(2, 9)}`;
     const channel = supabase.channel(channelId)
@@ -73,7 +84,7 @@ export const useProducts = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchProducts]);
+  }, [category, search]); // Re-run when filters change
 
   return {
     products,
