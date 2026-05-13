@@ -68,7 +68,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
         
         if (!session) {
           const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
-                                 (typeof window !== 'undefined' ? window.location.origin.replace('admin-dashboard', 'customer-app') : "http://localhost:8081");
+                                 (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') 
+                                   ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
+                                   : "http://localhost:8081");
           window.location.href = `${CUSTOMER_APP_URL}/login`;
           return;
         }
@@ -89,7 +91,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
             localStorage.clear();
           }
           const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
-                                 (typeof window !== 'undefined' ? window.location.origin.replace('admin-dashboard', 'customer-app') : "http://localhost:8081");
+                                 (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+                                   ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
+                                   : "http://localhost:8081");
           window.location.href = `${CUSTOMER_APP_URL}/login?error=unauthorized`;
           return;
         }
