@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Platform, TextInput, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, Platform, TextInput, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { COLORS, SPACING } from '../theme/colors';
 import { JuicyLogo } from './JuicyLogo';
 import { ShoppingCart, User, Search, X, MapPin, ChevronDown } from 'lucide-react-native';
@@ -8,6 +8,7 @@ import { useCartStore } from '../store/useCartStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { useLocation } from '../hooks/useLocation';
 
 interface HeaderProps {
   searchValue?: string;
@@ -31,6 +32,9 @@ export const Header: React.FC<HeaderProps> = ({
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const [isFocused, setIsFocused] = useState(false);
 
+  // Location Hook
+  const { address, loading: locating, fetchLocation, error: locationError } = useLocation();
+
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
 
@@ -39,6 +43,13 @@ export const Header: React.FC<HeaderProps> = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     router.push(route as any);
+  };
+
+  const handleLocationPress = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    fetchLocation();
   };
 
   return (
@@ -59,16 +70,29 @@ export const Header: React.FC<HeaderProps> = ({
             </TouchableOpacity>
 
             {/* Location Selector */}
-            <TouchableOpacity style={styles.locationContainer} activeOpacity={0.7}>
+            <TouchableOpacity 
+              style={styles.locationContainer} 
+              activeOpacity={0.7}
+              onPress={handleLocationPress}
+              disabled={locating}
+            >
               <View style={styles.locationIconBg}>
-                <MapPin size={16} color={COLORS.primaryGreen} fill={COLORS.primaryGreen + '20'} />
+                {locating ? (
+                  <ActivityIndicator size="small" color={COLORS.primaryGreen} />
+                ) : (
+                  <MapPin size={16} color={COLORS.primaryGreen} fill={COLORS.primaryGreen + '20'} />
+                )}
               </View>
               <View style={styles.locationInfo}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                  <Text style={styles.locationLabel}>Delivery in 12 mins</Text>
-                  <ChevronDown size={14} color={COLORS.darkText} />
+                  <Text style={styles.locationLabel}>
+                    {locating ? 'Locating...' : 'Delivery in 12 mins'}
+                  </Text>
+                  {!locating && <ChevronDown size={14} color={COLORS.darkText} />}
                 </View>
-                <Text style={styles.locationValue} numberOfLines={1}>Select Location • Home</Text>
+                <Text style={styles.locationValue} numberOfLines={1}>
+                  {address ? `${address.area || address.city} • Home` : 'Select Location • Home'}
+                </Text>
               </View>
             </TouchableOpacity>
 

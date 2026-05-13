@@ -13,6 +13,7 @@ import {
   Modal,
   Pressable,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -129,6 +130,25 @@ export default function HomeScreen() {
         ListHeaderComponent={
           !searchQuery ? (
             <View style={{ marginBottom: 24 }}>
+              {/* Premium Promo Banner */}
+              <View style={styles.bannerContainer}>
+                <Image 
+                  source={{ uri: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80' }} // Placeholder or generated image URI
+                  style={styles.bannerImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.bannerOverlay}>
+                  <View style={styles.bannerBadge}>
+                    <Text style={styles.bannerBadgeText}>NEW ARRIVALS</Text>
+                  </View>
+                  <Text style={styles.bannerTitle}>Stock up on{"\n"}daily essentials</Text>
+                  <Text style={styles.bannerSubtitle}>Get farm-fresh goodness delivered in mins</Text>
+                  <TouchableOpacity style={styles.bannerBtn}>
+                    <Text style={styles.bannerBtnText}>Shop Now</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               <View style={styles.categoryGrid}>
                 {CATEGORIES.map((cat) => {
                   const Icon = cat.icon;
@@ -281,6 +301,81 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingBottom: 40,
     paddingTop: width >= 768 ? 100 : 140, // Increased to account for absolute header
+  },
+  bannerContainer: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    height: 200,
+    borderRadius: 32,
+    overflow: 'hidden',
+    backgroundColor: COLORS.primaryGreen,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+      } as any,
+      default: {
+        elevation: 10,
+        shadowColor: COLORS.primaryGreen,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+      }
+    })
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  bannerOverlay: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  bannerBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    backdropFilter: 'blur(4px)',
+  } as any,
+  bannerBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  bannerTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFF',
+    lineHeight: 32,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+    marginBottom: 20,
+    maxWidth: '80%',
+  },
+  bannerBtn: {
+    backgroundColor: '#FFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  bannerBtnText: {
+    color: COLORS.primaryGreen,
+    fontWeight: '900',
+    fontSize: 14,
   },
   categoryGrid: {
     flexDirection: 'row',
