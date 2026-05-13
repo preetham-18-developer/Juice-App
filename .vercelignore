@@ -1,0 +1,8 @@
+# Ignore mobile app and backend during Vercel dashboard build
+customer-app/
+razorpay-backend/
+docs/
+temp/
+.expo/
+*.apk
+*.ipa
