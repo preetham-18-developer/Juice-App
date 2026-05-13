@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   scrollContent: { 
     width: '100%',
     paddingBottom: 40,
-    paddingTop: width >= 768 ? 100 : 140, // Increased to account for absolute header
+    paddingTop: width >= 768 ? 100 : 180, // Increased further for mobile dual-row header
   },
   bannerContainer: {
     marginHorizontal: 16,
