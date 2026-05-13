@@ -222,7 +222,7 @@ export default function DeliveryOrdersPage() {
                 <p className="text-2xl font-black text-slate-900 dark:text-white">{stat.value}</p>
               </div>
             </motion.div>
-          ))}
+          )}
         </div>
 
         {/* Main Table Section */}
@@ -351,8 +351,9 @@ export default function DeliveryOrdersPage() {
               </tbody>
             </table>
           </div>
-          </React.Fragment>
-        }
+        </div>
+        </React.Fragment>
+      }
       </div>
     </AdminLayout>
   );
