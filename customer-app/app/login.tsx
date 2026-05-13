@@ -71,8 +71,11 @@ export default function LoginScreen() {
             
             if (userRole === 'super_admin' || userRole === 'admin') {
               if (Platform.OS === 'web') {
-                // Production Vercel Dashboard URL
-                const DASHBOARD_URL = "https://admin-dashboard-juice-icmc.vercel.app/admin/dashboard";
+                // Get the current session to pass tokens for SSO
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                // Production Vercel Dashboard URL with SSO tokens
+                const DASHBOARD_URL = `https://admin-dashboard-juice-icmc.vercel.app/admin/dashboard?access_token=${session?.access_token}&refresh_token=${session?.refresh_token}`;
                 window.location.href = DASHBOARD_URL;
               } else {
                 router.replace('/admin');
