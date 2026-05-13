@@ -203,27 +203,27 @@ export default function DeliveryOrdersPage() {
           <React.Fragment>
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { label: 'Active Deliveries', value: orders.filter(o => o.delivery_status !== 'delivered').length, icon: Navigation, color: 'text-blue-500', bg: 'bg-blue-50' },
-            { label: 'Fleet Online', value: partners.filter(p => p.availability_status === 'available').length, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-50' },
-            { label: 'Avg Time', value: '18 min', icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50' },
-            { label: 'Successful Today', value: orders.filter(o => o.delivery_status === 'delivered').length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-          ].map((stat, i) => (
-            <motion.div 
-              key={i}
-              whileHover={{ y: -4 }}
-              className="card-premium p-6 flex items-center gap-5"
-            >
-              <div className={cn("p-4 rounded-2xl", stat.bg)}>
-                <stat.icon size={24} className={stat.color} />
-              </div>
-              <div>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                <p className="text-2xl font-black text-slate-900 dark:text-white">{stat.value}</p>
-              </div>
-            </motion.div>
-          )}
-        </div>
+              {[
+                { label: 'Active Deliveries', value: orders.filter(o => o.delivery_status !== 'delivered').length, icon: Navigation, color: 'text-blue-500', bg: 'bg-blue-50' },
+                { label: 'Fleet Online', value: partners.filter(p => p.availability_status === 'available').length, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-50' },
+                { label: 'Avg Time', value: '18 min', icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50' },
+                { label: 'Successful Today', value: orders.filter(o => o.delivery_status === 'delivered').length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+              ].map((stat, i) => (
+                <motion.div 
+                  key={i}
+                  whileHover={{ y: -4 }}
+                  className="card-premium p-6 flex items-center gap-5"
+                >
+                  <div className={cn("p-4 rounded-2xl", stat.bg)}>
+                    <stat.icon size={24} className={stat.color} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{stat.value}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
 
         {/* Main Table Section */}
         <div className="card-premium overflow-hidden">
