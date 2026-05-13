@@ -118,25 +118,22 @@ export default function CartScreen() {
       }
 
       if (paymentMethod === 'online') {
-        const orderId = await placeOrder(user.id, formattedAddress, 'online', 'pending_payment', selectedAddress); 
-        
-        if (!orderId) {
-          setLoading(false);
-          return;
-        }
-
+        // NEW FLOW: Redirect to payment with items, DO NOT create order yet
         router.push({
           pathname: '/payment',
           params: {
             amount: totalAmount,
-            orderId: orderId,
-            name: user.user_metadata?.full_name || 'Customer',
-            email: user.email || '',
+            name: user?.user_metadata?.full_name || 'Customer',
+            email: user?.email || '',
             contact: phoneNumber,
+            // Pass necessary data for RPC later
+            address: formattedAddress,
+            locationData: JSON.stringify(selectedAddress),
+            items: JSON.stringify(items),
           }
         });
       } else {
-        await processOrder(user.id, 'COD_PENDING', formattedAddress);
+        await processOrder(user.id, formattedAddress);
       }
     } catch (err: any) {
       toastRef.current?.show("Something went wrong. Please try again.", 'error');
@@ -145,42 +142,43 @@ export default function CartScreen() {
     }
   };
 
-  const processOrder = async (userId: string, paymentId: string, addressOverride?: string) => {
+  const processOrder = async (userId: string, address: string) => {
     try {
-      const finalAddress = addressOverride || selectedAddress?.formattedAddress || 'Default Address';
-      const orderId = await placeOrder(userId, finalAddress, paymentMethod, 'PENDING', selectedAddress || undefined);
+      const orderId = await placeOrder(userId, address, 'cod', 'PENDING', selectedAddress || undefined);
 
       if (orderId) {
         await OrderTrackingService.initializeTracking(orderId);
 
+        // Notify Admin
         const orderPayload = {
           id: orderId,
           customerName: user?.user_metadata?.full_name || 'Valued Customer',
           customerPhone: phoneNumber,
-          address: finalAddress,
+          address: address,
           landmark: selectedAddress?.landmark,
           latitude: selectedAddress?.latitude || 0,
           longitude: selectedAddress?.longitude || 0,
           items: items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
           total: getGrandTotal(),
-          paymentType: paymentMethod,
+          paymentType: 'cod',
           createdAt: new Date().toISOString(),
         };
         
         NotificationService.sendOrderNotification(orderPayload).catch(console.error);
 
         clearCart();
-        toastRef.current?.show('Order placed! Tracking your delivery...', 'success');
-        setTimeout(() => {
-          router.replace(`/orders/${orderId}` as any);
-        }, 800);
-      } else {
-        setLoading(false);
-        Alert.alert('Order Failed', 'We couldn\'t save your order. Please try again.');
+        router.replace({
+          pathname: '/order-success',
+          params: {
+            orderId,
+            amount: getGrandTotal(),
+            address: address,
+            paymentType: 'cod'
+          }
+        });
       }
     } catch (err: any) {
-      setLoading(false);
-      Alert.alert('Error', 'An unexpected error occurred while placing your order.');
+      Alert.alert('Order Failed', err.message || 'An unexpected error occurred.');
     }
   };
 

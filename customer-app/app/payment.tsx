@@ -41,21 +41,32 @@ type PaymentState =
 export default function PaymentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { amount, name, email, contact, orderId: orderIdFromParams } = params;
-  const { clearCart } = useCartStore();
+  const { 
+    amount, 
+    name, 
+    email, 
+    contact, 
+    address, 
+    locationData: locationDataStr, 
+    items: itemsStr 
+  } = params;
+  
+  const { clearCart, placeOrder } = useCartStore();
   const toastRef = useRef<ToastHandle>(null);
 
-  // All hooks at the top — never after conditional returns
+  // All hooks at the top
   const webViewRef = useRef<any>(null);
   const iframeRef = useRef<any>(null);
 
   const [razorpayKey, setRazorpayKey] = useState<string | null>(null);
-  const [orderId, setOrderId] = useState<string | null>(null);
+  const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<PaymentState>('IDLE');
   const [preloading, setPreloading] = useState(true);
-  const [saveError, setSaveError] = useState<{ msg: string; data: any } | null>(null);
 
-  // Compute checkout variables — always, not conditionally
+  // Parse complex params
+  const items = useMemo(() => itemsStr ? JSON.parse(itemsStr as string) : [], [itemsStr]);
+  const locationData = useMemo(() => locationDataStr ? JSON.parse(locationDataStr as string) : null, [locationDataStr]);
+
   const resolvedKey = useMemo(
     () => (razorpayKey || process.env.EXPO_PUBLIC_RAZORPAY_KEY || '').trim(),
     [razorpayKey]
@@ -66,7 +77,7 @@ export default function PaymentScreen() {
   const safeContact = useMemo(() => String(contact || '').replace(/['"]/g, ''), [contact]);
 
   const checkoutHtml = useMemo(() => {
-    if (!orderId || !resolvedKey) return '';
+    if (!razorpayOrderId || !resolvedKey) return '';
     return `
       <!DOCTYPE html>
       <html>
@@ -89,7 +100,7 @@ export default function PaymentScreen() {
               "currency": "INR",
               "name": "${safeName}",
               "description": "Premium Juice Order",
-              "order_id": "${orderId}",
+              "order_id": "${razorpayOrderId}",
               "handler": function(r){ sendToApp("success", r); },
               "prefill": { "name": "${safeName}", "email": "${safeEmail}", "contact": "${safeContact}" },
               "theme": { "color": "#3A8C3F" },
@@ -114,7 +125,7 @@ export default function PaymentScreen() {
         </body>
       </html>
     `;
-  }, [orderId, resolvedKey, amountInPaise, safeName, safeEmail, safeContact]);
+  }, [razorpayOrderId, resolvedKey, amountInPaise, safeName, safeEmail, safeContact]);
 
   // Background preload of Razorpay order
   useEffect(() => {
@@ -127,7 +138,7 @@ export default function PaymentScreen() {
           { timeout: 30000 }
         );
         if (isMounted && response.data?.success && response.data?.order_id) {
-          setOrderId(response.data.order_id);
+          setRazorpayOrderId(response.data.order_id);
           setRazorpayKey(response.data.key_id);
         }
       } catch (err) {
@@ -165,7 +176,7 @@ export default function PaymentScreen() {
       } catch {}
     }
 
-    if (orderId && razorpayKey) {
+    if (razorpayOrderId && razorpayKey) {
       setPaymentState('OPENING_RAZORPAY');
       return;
     }
@@ -179,7 +190,7 @@ export default function PaymentScreen() {
         { timeout: 30000 }
       );
       if (response.data?.success && response.data?.order_id) {
-        setOrderId(response.data.order_id);
+        setRazorpayOrderId(response.data.order_id);
         setRazorpayKey(response.data.key_id);
         setPaymentState('OPENING_RAZORPAY');
       } else {
@@ -195,10 +206,9 @@ export default function PaymentScreen() {
   const finalizeOrder = async (razorpayData: any) => {
     if (paymentState === 'VERIFYING_PAYMENT' || paymentState === 'PAYMENT_SUCCESS') return;
     setPaymentState('VERIFYING_PAYMENT');
-    setSaveError(null);
 
     try {
-      // Verify signature server-side
+      // 1. Verify signature server-side
       const verifyRes = await axios.post(
         `${BACKEND_URL}/verify-payment`,
         {
@@ -208,38 +218,42 @@ export default function PaymentScreen() {
         },
         { timeout: 30000 }
       );
-      if (!verifyRes.data?.success) throw new Error('Verification failed');
+      if (!verifyRes.data?.success) throw new Error('Payment verification failed. Security alert triggered.');
 
-      // Update order in Supabase
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({
-          status: 'PENDING',
-          payment_status: 'paid',
-          razorpay_order_id: razorpayData.razorpay_order_id,
-          razorpay_payment_id: razorpayData.razorpay_payment_id,
-          razorpay_signature: razorpayData.razorpay_signature,
-        })
-        .eq('id', orderIdFromParams);
+      // 2. NOW PLACE ORDER IN SUPABASE (RPC)
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error('User session expired. Please login again.');
 
-      if (updateError) throw updateError;
+      const orderId = await placeOrder(
+        userId, 
+        address as string, 
+        'online', 
+        'PENDING', 
+        locationData,
+        {
+          order_id: razorpayData.razorpay_order_id,
+          payment_id: razorpayData.razorpay_payment_id,
+          signature: razorpayData.razorpay_signature
+        }
+      );
 
-      // 1. Initialize tracking immediately
-      await OrderTrackingService.initializeTracking(orderIdFromParams as string);
+      if (!orderId) throw new Error('Failed to create order record. Please contact support.');
 
-      // Send notification
+      // 3. Initialize tracking
+      await OrderTrackingService.initializeTracking(orderId);
+
+      // 4. Send notification
       try {
-        const { items, getTotal } = useCartStore.getState();
         const orderPayload: OrderNotificationPayload = {
-          id: orderIdFromParams as string,
+          id: orderId,
           customerName: (name as string) || 'Customer',
           customerPhone: (contact as string) || 'N/A',
-          address: 'Online Order',
-          landmark: '',
-          latitude: 0,
-          longitude: 0,
+          address: (address as string) || 'Online Order',
+          landmark: locationData?.landmark || '',
+          latitude: locationData?.latitude || 0,
+          longitude: locationData?.longitude || 0,
           items: items.map((i: any) => ({ name: i.name || 'Juice Item', quantity: i.quantity, price: i.price })),
-          total: getTotal(),
+          total: Number(amount),
           paymentType: 'online',
           createdAt: new Date().toISOString(),
         };
@@ -251,14 +265,25 @@ export default function PaymentScreen() {
       setPaymentState('PAYMENT_SUCCESS');
       clearCart();
       
-      // Navigate to live tracking after a short delay for success animation
+      // Navigate to premium success screen
       setTimeout(() => {
-        router.replace(`/orders/${orderIdFromParams}` as any);
-      }, 3000);
+        router.replace({
+          pathname: '/order-success',
+          params: {
+            orderId,
+            amount: amount,
+            address: address,
+            paymentType: 'online'
+          }
+        });
+      }, 1500);
     } catch (err: any) {
       console.error('[Payment] Finalize failed:', err.message);
       setPaymentState('PAYMENT_FAILED');
-      setSaveError({ msg: err.message, data: razorpayData });
+      router.push({
+        pathname: '/order-failure',
+        params: { error: err.message }
+      });
     }
   };
 
@@ -275,7 +300,10 @@ export default function PaymentScreen() {
         toastRef.current?.show('Payment was cancelled.', 'info');
       } else {
         setPaymentState('PAYMENT_FAILED');
-        toastRef.current?.show(data.message || 'Payment failed.', 'error');
+        router.push({
+          pathname: '/order-failure',
+          params: { error: data.message || 'Payment failed' }
+        });
       }
     } catch {
       setPaymentState('PAYMENT_FAILED');
@@ -341,69 +369,8 @@ export default function PaymentScreen() {
             <CheckCircle2 size={100} color={COLORS.primaryGreen} />
           </Animated.View>
           <Text style={styles.successTitle}>Payment Successful!</Text>
-          <Text style={styles.successSubtitle}>Generating your receipt...</Text>
+          <Text style={styles.successSubtitle}>Preparing your fresh order...</Text>
           <ActivityIndicator size="small" color={COLORS.primaryGreen} style={{ marginTop: 20 }} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // ─── Render: Receipt ─────────────────────────────────────────────────────
-  if (paymentState === 'SHOWING_RECEIPT') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.receiptContainer}>
-          <LinearGradient colors={['#4ADE80', '#22C55E']} style={styles.receiptHeader}>
-            <CheckCircle2 size={48} color="#FFFFFF" />
-            <Text style={styles.receiptTitle}>Order Confirmed</Text>
-            <Text style={styles.receiptId}>
-              Order ID: #{orderIdFromParams?.toString().slice(0, 8).toUpperCase()}
-            </Text>
-          </LinearGradient>
-
-          <View style={styles.receiptContent}>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Amount Paid</Text>
-              <Text style={styles.receiptValue}>₹{amount}</Text>
-            </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Payment Method</Text>
-              <Text style={styles.receiptValue}>Online Payment</Text>
-            </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Customer</Text>
-              <Text style={styles.receiptValue}>{name}</Text>
-            </View>
-          </View>
-
-          <View style={styles.receiptFooter}>
-            <TouchableOpacity style={styles.homeBtn} onPress={() => router.replace('/(tabs)')}>
-              <Home size={20} color="#FFFFFF" />
-              <Text style={styles.homeBtnText}>Go to Homepage</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // ─── Render: Save error / retry ─────────────────────────────────────────
-  if (saveError) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContent}>
-          <Animated.View entering={ZoomIn}>
-            <AlertCircle size={80} color="#ef4444" />
-          </Animated.View>
-          <Text style={[styles.title, { color: '#ef4444', marginTop: 20 }]}>Order Pending</Text>
-          <Text style={styles.errorText}>
-            Payment succeeded but order save failed. Your money is safe.
-          </Text>
-          <Text style={styles.errorSub}>Ref: {saveError.data?.razorpay_payment_id}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => finalizeOrder(saveError.data)}>
-            <RefreshCw size={20} color="#fff" />
-            <Text style={styles.retryBtnText}>Complete My Order Now</Text>
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -499,33 +466,4 @@ const styles = StyleSheet.create({
   verifySubtitle: { ...TYPOGRAPHY.subtext, textAlign: 'center', marginTop: 8 },
   successTitle: { ...TYPOGRAPHY.h1, marginTop: 24, color: COLORS.primaryGreen, textAlign: 'center' },
   successSubtitle: { ...TYPOGRAPHY.subtext, marginTop: 8, textAlign: 'center' },
-  receiptContainer: {
-    flex: 1, backgroundColor: '#fff', margin: 20, borderRadius: 32,
-    overflow: 'hidden', elevation: 10, shadowColor: '#000',
-    shadowOpacity: 0.1, shadowRadius: 20,
-  },
-  receiptHeader: { padding: 40, alignItems: 'center' },
-  receiptTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 16 },
-  receiptId: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  receiptContent: { padding: 32, gap: 20 },
-  receiptRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 15,
-  },
-  receiptLabel: { color: COLORS.mutedGray, fontSize: 14 },
-  receiptValue: { color: COLORS.darkText, fontWeight: 'bold', fontSize: 16 },
-  receiptFooter: { padding: 32, gap: 16 },
-  homeBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, backgroundColor: COLORS.primaryGreen, padding: 18, borderRadius: 20,
-  },
-  homeBtnText: { color: '#fff', fontWeight: 'bold' },
-  errorText: { ...TYPOGRAPHY.subtext, textAlign: 'center', marginTop: 12 },
-  errorSub: { fontSize: 12, color: COLORS.mutedGray, marginTop: 8 },
-  retryBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: COLORS.primaryGreen, paddingHorizontal: 24,
-    paddingVertical: 16, borderRadius: 20, marginTop: 24,
-  },
-  retryBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });

@@ -43,14 +43,11 @@ const { width } = Dimensions.get('window');
 const STEP_COUNT = ORDER_STATUS_FLOW.length;
 
 // ─── Step icon mapping ───────────────────────────────────────────────────────
+// ─── Step icon mapping ───────────────────────────────────────────────────────
 const STEP_ICONS: Record<number, React.ElementType> = {
   0: ClipboardCheck,
   1: CheckCircle2,
-  2: Package,
-  3: Package,
-  4: Truck,
-  5: MapPin,
-  6: Home,
+  2: Home,
 };
 
 // ─── Individual Step ────────────────────────────────────────────────────────
@@ -232,7 +229,13 @@ const PartnerCard = memo(({ partner }: { partner: any }) => {
         </View>
         <TouchableOpacity 
           style={styles.callBtn}
-          onPress={() => Alert.alert('Calling Partner', `Connecting to ${partner.phone}...`)}
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Linking.openURL(`tel:${partner.phone}`);
+            } else {
+              Alert.alert('Calling Partner', `Connecting to ${partner.phone}...`);
+            }
+          }}
         >
           <Text style={styles.callBtnText}>Call</Text>
         </TouchableOpacity>
@@ -270,14 +273,14 @@ export function OrderTracker({
         <Text style={styles.title}>
           {isDelivered ? '🎉 Order Delivered!' : '📦 Live Order Tracking'}
         </Text>
-        <ETABadge eta={estimatedDelivery ?? null} />
+        {!isDelivered && <ETABadge eta={estimatedDelivery ?? null} />}
       </View>
 
       {/* Progress bar */}
       <ProgressBar percent={progressPercent} />
 
       {/* Delivery Partner Card */}
-      {deliveryPartner && <PartnerCard partner={deliveryPartner} />}
+      {deliveryPartner && !isDelivered && <PartnerCard partner={deliveryPartner} />}
 
       {/* Steps */}
       <View style={styles.stepsContainer}>

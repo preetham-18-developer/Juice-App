@@ -31,7 +31,7 @@ interface CartStore {
   updateDeliveryFee: (lat: number, lng: number) => Promise<number>;
   getTotal: () => number;
   getGrandTotal: () => number;
-  placeOrder: (userId: string, address: string, paymentType: 'online' | 'cod', initialStatus?: string, locationData?: Partial<StructuredAddress>) => Promise<string | null>;
+  placeOrder: (userId: string, address: string, paymentType: 'online' | 'cod', initialStatus?: string, locationData?: Partial<StructuredAddress>, razorpayData?: { order_id: string; payment_id: string; signature: string }) => Promise<string | null>;
 }
 
 import { StructuredAddress, LocationService } from '../services/LocationService';
@@ -138,7 +138,7 @@ export const useCartStore = create<CartStore>()(
           throw err;
         }
       },
-      placeOrder: async (userId, address, paymentType, initialStatus = 'received', locationData) => {
+      placeOrder: async (userId, address, paymentType, initialStatus = 'PENDING', locationData, razorpayData) => {
         return await monitor.trackPerformance('PlaceOrder', async () => {
           const { items, getTotal } = get();
           try {
@@ -165,7 +165,10 @@ export const useCartStore = create<CartStore>()(
               p_city: locationData?.city,
               p_postal_code: locationData?.postalCode,
               p_landmark: locationData?.landmark,
-              p_delivery_fee: get().deliveryFee // Pass the fee
+              p_delivery_fee: get().deliveryFee,
+              p_razorpay_order_id: razorpayData?.order_id,
+              p_razorpay_payment_id: razorpayData?.payment_id,
+              p_razorpay_signature: razorpayData?.signature
             });
 
             if (error) throw error;

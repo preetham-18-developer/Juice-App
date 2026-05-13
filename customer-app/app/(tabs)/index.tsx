@@ -4,29 +4,24 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  ScrollView, 
   FlatList,
   StatusBar,
-  RefreshControl,
   TouchableOpacity,
-  Animated,
   Platform,
   ActivityIndicator,
   Dimensions,
   Modal,
   Pressable,
-  useWindowDimensions
+  useWindowDimensions,
 } from 'react-native';
+
+const { width } = Dimensions.get('window');
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Header } from '../../src/components/Header';
-import { CategoryPill } from '../../src/components/CategoryPill';
 import PremiumCard from '../../src/components/ui/PremiumCard';
 import { SkeletonLoader } from '../../src/components/SkeletonLoader';
-import { SearchBar } from '../../src/components/SearchBar';
 import { Toast, ToastHandle } from '../../src/components/ui/Toast';
 import { EmptyState } from '../../src/components/ui/EmptyState';
-import { OfflineBanner } from '../../src/components/OfflineBanner';
 import { useProducts } from '../../src/hooks/useProducts';
 import { ShoppingBag, Apple, Bean, Citrus, Leaf, X } from 'lucide-react-native';
 import { useDebounce } from '../../src/hooks/useDebounce';
@@ -34,73 +29,41 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCartStore } from '../../src/store/useCartStore';
 import { ProductService } from '../../src/services/ProductService';
 import { Product } from '../../src/types';
-import { COLORS, SPACING } from '../../src/theme/colors';
+import { COLORS } from '../../src/theme/colors';
 import { TYPOGRAPHY } from '../../src/theme/typography';
 
 const CATEGORIES = [
-  { id: 'all', label: 'All', icon: <Citrus size={24} /> },
-  { id: 'fruit', label: 'Fruits', icon: <Apple size={24} /> },
-  { id: 'juice', label: 'Juices', icon: <Bean size={24} /> },
-  { id: 'organic', label: 'Organic', icon: <Leaf size={24} /> },
+  { id: 'all', label: 'All', icon: Citrus, color: '#F0FDF4', borderColor: '#DCFCE7' },
+  { id: 'fruit', label: 'Fruits', icon: Apple, color: '#FFF7ED', borderColor: '#FFEDD5' },
+  { id: 'juice', label: 'Juices', icon: Bean, color: '#EFF6FF', borderColor: '#DBEAFE' },
+  { id: 'vegetable', label: 'Vegetables', icon: Leaf, color: '#F0FDF4', borderColor: '#DCFCE7' },
+  { id: 'other', label: 'Others', icon: Citrus, color: '#F8FAFC', borderColor: '#F1F5F9' },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { category: paramCategory } = useLocalSearchParams<{ category: string }>();
   const addItem = useCartStore((state) => state.addItem);
   const toastRef = useRef<ToastHandle>(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
 
-  const { products, loading, refreshing, error, hasMore, loadMore, refresh, retry } = useProducts({
+  const { products, loading, refreshing, error, hasMore, loadMore, refresh } = useProducts({
     category: activeCategory,
     search: debouncedSearch
   });
   
-  const featuredProducts = useMemo(() => {
-    return products.slice(0, 5).map((p, idx) => ({
-      id: p.id,
-      name: p.name,
-      price: ProductService.getPrice(p),
-      image_url: p.image_url || [
-        "https://images.unsplash.com/photo-1622597467836-f3285f2131b8?q=80&w=800",
-        "https://images.unsplash.com/photo-1546173159-315724a31696?q=80&w=800",
-        "https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?q=80&w=800",
-        "https://images.unsplash.com/photo-1595981267035-7b04ca84a82d?q=80&w=800",
-        "https://images.unsplash.com/photo-1613478223719-2ab802602423?q=80&w=800"
-      ][idx % 5],
-      category: p.category,
-      rating: p.rating || 4.8 // Use real rating if available
-    }));
-  }, [products]);
-
   const { width: windowWidth } = useWindowDimensions();
+  const numColumns = useMemo(() => windowWidth >= 1024 ? 3 : 2, [windowWidth]);
+  const gridGap = 16;
+  const horizontalPadding = windowWidth > 768 ? 32 : 16;
+  const cardWidth = Math.max(120, (Math.min(windowWidth, 1400) - (horizontalPadding * 2) - (gridGap * (numColumns - 1))) / numColumns);
   
-  const numColumns = useMemo(() => {
-    if (windowWidth >= 1024) return 3;
-    return 2;
-  }, [windowWidth]);
-
-  const gridGap = 12;
-  const horizontalPadding = windowWidth > 768 ? 32 : 12;
-  // Clamp to min 120 so cards never collapse to 0 width on web
-  const cardWidth = Math.max(
-    120,
-    (Math.min(windowWidth, 1400) - (horizontalPadding * 2) - (gridGap * (numColumns - 1))) / numColumns
-  );
-  
-  // Filter states
   const [filterVisible, setFilterVisible] = useState(false);
   const [priceRange, setPriceRange] = useState<number>(500);
   const [selectedSort, setSelectedSort] = useState<'none' | 'price_low' | 'price_high' | 'popular'>('popular');
 
-  useEffect(() => {
-    // Logic removed for directness
-  }, [loading]);
-
   const filteredProducts = useMemo(() => {
-    // Only sorting and price filtering remaining on client for instant UX
     let result = products.filter(p => {
       const price = p.price || p.price_per_kg || 0;
       return price <= priceRange;
@@ -111,26 +74,24 @@ export default function HomeScreen() {
     } else if (selectedSort === 'price_high') {
       result.sort((a, b) => (b.price || b.price_per_kg || 0) - (a.price || a.price_per_kg || 0));
     } else if (selectedSort === 'popular') {
-      // Prioritize available and category-specific items
       result.sort((a, b) => {
         if (a.is_available && !b.is_available) return -1;
         if (!a.is_available && b.is_available) return 1;
         return (b.rating || 0) - (a.rating || 0);
       });
     }
-
     return result;
   }, [products, priceRange, selectedSort]);
 
   const handleAddToCart = useCallback((item: Product) => {
     addItem(item);
-    toastRef.current?.show(`${item.name} added to your basket! 🧺`, 'success');
+    toastRef.current?.show(`${item.name} added! 🧺`, 'success');
   }, [addItem]);
 
   const renderSkeleton = () => (
     <View style={styles.grid}>
       {[1, 2, 3, 4].map((i) => (
-        <View key={i} style={styles.skeletonCard}>
+        <View key={i} style={{ width: cardWidth, marginBottom: 24 }}>
           <SkeletonLoader width="100%" height={180} borderRadius={28} />
           <View style={{ marginTop: 12, gap: 8 }}>
             <SkeletonLoader width="70%" height={20} />
@@ -144,17 +105,14 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      {!searchQuery && <Header />}
-      {!searchQuery && <OfflineBanner />}
-      <Toast ref={toastRef} />
-      
-      <SearchBar 
-        value={searchQuery} 
-        onChangeText={setSearchQuery} 
-        onClear={() => setSearchQuery('')}
+      <Header 
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchClear={() => setSearchQuery('')}
         onFilterPress={() => setFilterVisible(true)}
       />
-
+      <Toast ref={toastRef} />
+      
       <FlatList
         data={filteredProducts}
         keyExtractor={(item) => item.id}
@@ -168,35 +126,46 @@ export default function HomeScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         initialNumToRender={8}
-        maxToRenderPerBatch={6}
-        windowSize={5}
-        updateCellsBatchingPeriod={100}
-        removeClippedSubviews={Platform.OS === 'android'}
         ListHeaderComponent={
           !searchQuery ? (
-            <View style={Platform.OS === 'web' ? { width: '100%', zIndex: 10 } : null}>
-              <View style={styles.categoryContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
-                  {CATEGORIES.map((cat) => (
-                    <CategoryPill
-                      key={cat.id}
-                      label={cat.label}
-                      icon={cat.icon ? React.cloneElement(cat.icon as React.ReactElement, { 
-                        color: activeCategory === cat.id ? COLORS.white : COLORS.darkText 
-                      }) : null}
-                      active={activeCategory === cat.id}
+            <View style={{ marginBottom: 24 }}>
+              <View style={styles.categoryGrid}>
+                {CATEGORIES.map((cat) => {
+                  const Icon = cat.icon;
+                  return (
+                    <TouchableOpacity 
+                      key={cat.id} 
+                      style={[
+                        styles.categoryBox, 
+                        { backgroundColor: cat.color, borderColor: cat.borderColor },
+                        activeCategory === cat.id ? { borderWidth: 2, borderColor: COLORS.primaryGreen } : null
+                      ]}
                       onPress={() => setActiveCategory(cat.id)}
-                    />
-                  ))}
-                </ScrollView>
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.categoryIconBg}>
+                        <Icon 
+                          color={activeCategory === cat.id ? COLORS.primaryGreen : COLORS.darkText}
+                          size={28}
+                        />
+                      </View>
+                      <Text style={[
+                        styles.categoryLabel, 
+                        activeCategory === cat.id ? { color: COLORS.primaryGreen, fontWeight: '900' } : null
+                      ]}>
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               <View style={styles.sectionHeader}>
-                <View style={{ paddingHorizontal: 0, marginVertical: 16 }}>
+                <View>
                   <Text style={TYPOGRAPHY.h2}>
-                    {activeCategory === 'all' ? 'Popular Items' : `${activeCategory.charAt(0).toUpperCase()}${activeCategory.slice(1)}s`}
+                    {activeCategory === 'all' ? 'Fresh for You' : `${activeCategory.charAt(0).toUpperCase()}${activeCategory.slice(1)}s`}
                   </Text>
-                  <Text style={styles.subtitleText}>Hand-picked freshness for you</Text>
+                  <Text style={styles.subtitleText}>Hand-picked daily harvest</Text>
                 </View>
               </View>
             </View>
@@ -306,78 +275,73 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: COLORS.creamBackground,
-    alignItems: 'center' 
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: { 
     width: '100%',
-    maxWidth: 1400, // High-end desktop width
     paddingBottom: 40,
+    paddingTop: width >= 768 ? 100 : 140, // Increased to account for absolute header
   },
-  categoryContainer: { backgroundColor: COLORS.creamBackground, paddingVertical: 10 },
-  categoryList: { paddingHorizontal: SPACING.md },
-  section: { marginTop: SPACING.md },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    gap: 12,
+    justifyContent: 'center'
+  },
+  categoryBox: {
+    width: (width - 32 - 24) / 3,
+    maxWidth: 120,
+    height: 110,
+    borderRadius: 24,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    marginBottom: 4,
+  },
+  categoryIconBg: {
+    width: 54,
+    height: 54,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkText,
+    textAlign: 'center',
+  },
   sectionHeader: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'flex-end', 
-    paddingHorizontal: SPACING.md, 
-    marginBottom: SPACING.lg 
+    paddingHorizontal: 16, 
+    marginTop: 32,
+    marginBottom: 16
   },
   subtitleText: { 
-    fontFamily: 'Calibri',
     fontSize: 13, 
-    color: COLORS.mutedGray, 
+    color: '#6B7280', 
     marginTop: 2, 
-    fontWeight: '500' 
+    fontWeight: '600' 
   },
-  sortBadge: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#E8F5E9', 
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
-    borderRadius: 12,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(46, 125, 50, 0.1)'
-  },
-  sortBadgeText: { fontSize: 12, fontWeight: '700', color: COLORS.primaryGreen },
   grid: { 
     flexDirection: 'row', 
     flexWrap: 'wrap', 
-    justifyContent: 'space-between', 
     paddingHorizontal: 16,
     gap: 16
   },
-  skeletonCard: { width: '48%', marginBottom: SPACING.xl },
-  errorContainer: { alignItems: 'center', padding: 40, marginTop: 40 },
-  errorText: { fontSize: 15, color: COLORS.mutedGray, marginTop: 12, textAlign: 'center' },
-  retryButton: { marginTop: 20, backgroundColor: COLORS.white, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: COLORS.primaryGreen },
-  retryText: { color: COLORS.primaryGreen, fontWeight: 'bold' },
-  emptyState: { alignItems: 'center', justifyContent: 'center', padding: 60, marginTop: 20 },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: COLORS.darkText, marginTop: 16 },
-  emptySubtitle: { fontSize: 15, color: COLORS.mutedGray, marginTop: 8, textAlign: 'center', lineHeight: 22 },
-  resetButton: { 
-    marginTop: 28, 
-    backgroundColor: COLORS.primaryGreen, 
-    paddingHorizontal: 28, 
-    paddingVertical: 14, 
-    borderRadius: 18,
-    shadowColor: COLORS.primaryGreen,
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4
-  },
-  resetText: { color: COLORS.white, fontWeight: '800', fontSize: 15 },
-  
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalContent: { 
-    backgroundColor: COLORS.white, 
+    backgroundColor: '#FFFFFF', 
     borderTopLeftRadius: 40, 
     borderTopRightRadius: 40, 
-    padding: SPACING.xl,
+    padding: 24,
     paddingBottom: Platform.OS === 'ios' ? 50 : 30
   },
   modalIndicator: { width: 40, height: 4, backgroundColor: '#E2E8F0', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
@@ -385,26 +349,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginBottom: SPACING.xl 
+    marginBottom: 24 
   },
   filterSection: { marginBottom: 32 },
   filterLabel: { 
-    fontFamily: 'Calibri',
     fontSize: 17, 
     fontWeight: '900', 
-    color: COLORS.darkText, 
+    color: '#1A1A1A', 
     marginBottom: 18 
   },
   sortOptions: { gap: 12 },
   sortBtn: { padding: 18, borderRadius: 20, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#F1F5F9' },
-  sortBtnActive: { backgroundColor: '#F0FDF4', borderColor: COLORS.primaryGreen },
+  sortBtnActive: { backgroundColor: '#F0FDF4', borderColor: '#2E7D32' },
   sortText: { 
-    fontFamily: 'Calibri',
     fontSize: 15, 
     fontWeight: '700', 
-    color: COLORS.darkText 
+    color: '#1A1A1A' 
   },
-  sortTextActive: { color: COLORS.primaryGreen },
+  sortTextActive: { color: '#2E7D32' },
   priceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   priceBtn: { 
     paddingHorizontal: 20, 
@@ -414,28 +376,26 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: '#F1F5F9' 
   },
-  priceBtnActive: { backgroundColor: '#FFF7ED', borderColor: COLORS.primaryOrange },
+  priceBtnActive: { backgroundColor: '#FFF7ED', borderColor: '#E67E22' },
   priceText: { 
-    fontFamily: 'Calibri',
     fontSize: 14, 
     fontWeight: '700', 
-    color: COLORS.darkText 
+    color: '#1A1A1A' 
   },
-  priceTextActive: { color: COLORS.primaryOrange },
+  priceTextActive: { color: '#E67E22' },
   applyBtn: { 
-    backgroundColor: COLORS.primaryGreen, 
+    backgroundColor: '#2E7D32', 
     paddingVertical: 20, 
     borderRadius: 22, 
     alignItems: 'center',
-    shadowColor: COLORS.primaryGreen,
+    shadowColor: '#2E7D32',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
     elevation: 8
   },
   applyBtnText: { 
-    fontFamily: 'Calibri',
-    color: COLORS.white, 
+    color: '#FFFFFF', 
     fontSize: 18, 
     fontWeight: '900' 
   }

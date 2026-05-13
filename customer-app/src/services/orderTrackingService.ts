@@ -179,27 +179,19 @@ export const OrderTrackingService = {
 function getStatusDescription(status: OrderStatus): string {
   const map: Record<OrderStatus, string> = {
     PENDING:          'We\'ve received your order.',
-    CONFIRMED:        'Your order is confirmed and being queued.',
-    PREPARING:        'Our team is freshly preparing your juices.',
-    PACKED:           'Your items are safely packed and sealed.',
-    OUT_FOR_DELIVERY: 'Your order is on the way.',
-    NEARBY:           'Delivery partner is a few minutes away.',
-    DELIVERED:        'Order delivered successfully!',
+    CONFIRMED:        'Your order is confirmed and juices are being prepared!',
+    DELIVERED:        'Order delivered successfully! Enjoy 🧃',
     CANCELLED:        'Your order was cancelled.',
   };
-  return map[status];
+  return map[status] || '';
 }
 
 function getStatusLabel(status: OrderStatus): string {
   const map: Record<OrderStatus, string> = {
     PENDING:          'Order Placed',
-    CONFIRMED:        'Confirmed',
-    PREPARING:        'Preparing',
-    PACKED:           'Packed',
-    OUT_FOR_DELIVERY: 'Out for Delivery',
-    NEARBY:           'Almost There',
+    CONFIRMED:        'Order Confirmed',
     DELIVERED:        'Delivered',
     CANCELLED:        'Cancelled',
   };
-  return map[status];
+  return map[status] || '';
 }

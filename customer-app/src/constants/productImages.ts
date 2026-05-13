@@ -28,7 +28,6 @@ export const PRODUCT_IMAGE_MAP: Record<string, any> = {
 export const CATEGORY_PLACEHOLDERS: Record<string, string> = {
   juice:     'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=800&q=80',
   fruit:     'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=800&q=80',
-  organic:   'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80',
   vegetable: 'https://images.unsplash.com/photo-1566385270613-5f056a4e5074?w=800&q=80',
 };
 

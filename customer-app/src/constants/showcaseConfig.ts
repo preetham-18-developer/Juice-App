@@ -16,10 +16,10 @@ export const SHOWCASE_CONFIG = {
 export const SHOWCASE_ITEMS = [
   {
     id: 's1',
-    title: '100% Organic',
-    subtitle: 'From Local Farms',
+    title: 'Farm Fresh Vegetables',
+    subtitle: 'Crisp & Nutritious',
     imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800',
-    category: 'organic'
+    category: 'vegetable'
   },
   {
     id: 's2',
