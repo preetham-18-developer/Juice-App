@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useRealtime } from '@/hooks/useRealtime';
 import Skeleton from '@/components/ui/Skeleton';
+import DeliveryAnalytics from '@/components/delivery/DeliveryAnalytics';
 
 const deliveryStatuses = [
   { label: 'All', value: 'all' },
@@ -151,6 +152,8 @@ export default function DeliveryOrdersPage() {
     return matchesTab && matchesSearch;
   });
 
+  const [viewMode, setViewMode] = useState<'list' | 'analytics'>('list');
+
   return (
     <AdminLayout>
       <div className="space-y-8 pb-20">
@@ -168,21 +171,25 @@ export default function DeliveryOrdersPage() {
           </div>
           
           <div className="flex items-center gap-3">
-            <div className="flex -space-x-3">
-              {partners.slice(0, 4).map((p, i) => (
-                <div key={i} className="w-10 h-10 rounded-full border-4 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
-                  {p.profile_image ? (
-                    <img src={p.profile_image} className="w-full h-full object-cover" />
-                  ) : (
-                    <User size={16} className="text-slate-400" />
-                  )}
-                </div>
-              ))}
-              {partners.length > 4 && (
-                <div className="w-10 h-10 rounded-full border-4 border-white dark:border-slate-900 bg-primary text-white flex items-center justify-center text-xs font-black">
-                  +{partners.length - 4}
-                </div>
-              )}
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+              <button 
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  "px-6 py-2.5 rounded-xl text-xs font-black transition-all",
+                  viewMode === 'list' ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500"
+                )}
+              >
+                Order List
+              </button>
+              <button 
+                onClick={() => setViewMode('analytics')}
+                className={cn(
+                  "px-6 py-2.5 rounded-xl text-xs font-black transition-all",
+                  viewMode === 'analytics' ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500"
+                )}
+              >
+                Analytics
+              </button>
             </div>
             <button className="px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-black text-sm hover:shadow-lg transition-all">
               Manage Fleet
@@ -190,8 +197,12 @@ export default function DeliveryOrdersPage() {
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {viewMode === 'analytics' ? (
+          <DeliveryAnalytics orders={orders} partners={partners} />
+        ) : (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { label: 'Active Deliveries', value: orders.filter(o => o.delivery_status !== 'delivered').length, icon: Navigation, color: 'text-blue-500', bg: 'bg-blue-50' },
             { label: 'Fleet Online', value: partners.filter(p => p.availability_status === 'available').length, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-50' },
@@ -340,7 +351,7 @@ export default function DeliveryOrdersPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        )}
       </div>
     </AdminLayout>
   );
