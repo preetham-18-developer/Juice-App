@@ -197,9 +197,9 @@ export default function DeliveryOrdersPage() {
           </div>
         </div>
 
-        {viewMode === 'analytics' ? (
+        {viewMode === 'analytics' ? 
           <DeliveryAnalytics orders={orders} partners={partners} />
-        ) : (
+         : 
           <React.Fragment>
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -352,7 +352,7 @@ export default function DeliveryOrdersPage() {
             </table>
           </div>
           </React.Fragment>
-        )}
+        }
       </div>
     </AdminLayout>
   );
