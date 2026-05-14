@@ -12,7 +12,7 @@ const sanitizeUrl = (url: string) => {
 };
 
 const supabaseUrl = 'https://juozeonesytttmaizdso.supabase.co';
-const supabaseAnonKey = 'sb_publishable__Xiil3pRsK_lcEnv8dEulQ_Saz4tJSU';
+const supabaseAnonKey = 'sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__';
 
 /**
  * Robust Fetch wrapper with retries and timeouts to handle mobile network instability.
@@ -52,30 +52,18 @@ const robustFetch = async (url: string | URL | Request, options?: RequestInit, r
 // Detect platform correctly for both Web and Native
 const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
 
-// Custom storage adapter with web fallback for cross-platform support
+// Custom storage adapter - Simplified to AsyncStorage for maximum compatibility
 const SharedStorageAdapter = {
   getItem: async (key: string) => {
     if (isWeb) {
       return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
     }
     try {
-      // Try SecureStore first
-      const SecureStore = require('expo-secure-store');
-      const value = await SecureStore.getItemAsync(key);
-      if (value) return value;
-      
-      // Fallback to AsyncStorage
       const AsyncStorageModule = require('@react-native-async-storage/async-storage');
       const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
       return await AsyncStorage.getItem(key);
     } catch (e) {
-      try {
-        const AsyncStorageModule = require('@react-native-async-storage/async-storage');
-        const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
-        return await AsyncStorage.getItem(key);
-      } catch (inner) {
-        return null;
-      }
+      return null;
     }
   },
   setItem: async (key: string, value: string) => {
@@ -84,15 +72,10 @@ const SharedStorageAdapter = {
       return;
     }
     try {
-      const SecureStore = require('expo-secure-store');
-      await SecureStore.setItemAsync(key, value);
-    } catch (e) {
-      try {
-        const AsyncStorageModule = require('@react-native-async-storage/async-storage');
-        const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
-        await AsyncStorage.setItem(key, value);
-      } catch (inner) {}
-    }
+      const AsyncStorageModule = require('@react-native-async-storage/async-storage');
+      const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
+      await AsyncStorage.setItem(key, value);
+    } catch (e) {}
   },
   removeItem: async (key: string) => {
     if (isWeb) {
@@ -100,15 +83,10 @@ const SharedStorageAdapter = {
       return;
     }
     try {
-      const SecureStore = require('expo-secure-store');
-      await SecureStore.deleteItemAsync(key);
-    } catch (e) {
-      try {
-        const AsyncStorageModule = require('@react-native-async-storage/async-storage');
-        const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
-        await AsyncStorage.removeItem(key);
-      } catch (inner) {}
-    }
+      const AsyncStorageModule = require('@react-native-async-storage/async-storage');
+      const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
+      await AsyncStorage.removeItem(key);
+    } catch (e) {}
   },
 };
 

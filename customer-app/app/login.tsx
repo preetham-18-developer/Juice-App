@@ -113,52 +113,39 @@ export default function LoginScreen() {
     return null;
   };
 
-  const handleLogin = async () => {
-    const eErr = validateEmail(email);
-    const pErr = validatePassword(password);
-    
-    if (eErr || pErr) {
-      setEmailError(eErr);
-      setPasswordError(pErr);
-      setTouched({ email: true, password: true });
-      return;
-    }
-    
-    setLoading(true);
-    
-    const maxRetries = 3;
-    const baseDelay = 500; // 0.5s base for backoff
+    const handleLogin = async () => {
+      const eErr = validateEmail(email);
+      const pErr = validatePassword(password);
+      
+      if (eErr || pErr) {
+        setEmailError(eErr);
+        setPasswordError(pErr);
+        setTouched({ email: true, password: true });
+        return;
+      }
+      
+      setLoading(true);
+      const startTime = Date.now();
 
-    const performSignIn = async (attempt: number): Promise<void> => {
       try {
-        console.log(`[Auth] Step 1: Initiating sign-in attempt ${attempt + 1}`);
-        
+        // NUCLEAR SYNC: Direct connection bypass
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password: password.trim(),
         });
 
-        if (error) {
-          console.error("[Auth] Step 2: Server responded with error:", error);
-          
-          let userMessage = 'Invalid email or password.';
-          const technicalError = error.message || 'Unknown error';
-          const status = (error as any).status || 0;
+        const duration = Date.now() - startTime;
 
-          // DIFFERENTIATE ERRORS
-          if (status === 400) {
-             userMessage = 'Incorrect email or password. Please try again.';
-          } else if (status === 429) {
-             userMessage = 'Too many attempts. Please wait a few minutes.';
-          } else if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch') || technicalError.includes('TIMEOUT')) {
-            userMessage = 'Unable to connect to the server. Please check your data/WiFi.';
-          }
+        if (error) {
+          const status = (error as any).status || 0;
+          const technicalError = error.message || 'Unknown error';
           
-          toastRef.current?.show(userMessage, 'error');
+          toastRef.current?.show('Connection failed. Retrying with trace...', 'error');
+          
           if (Platform.OS !== 'web') {
             Alert.alert(
-              'Login Analysis', 
-              `Status: ${status}\nResult: ${userMessage}\n\nTrace: ${technicalError}`,
+              'Diagnostic Report', 
+              `Status: ${status}\nDuration: ${duration}ms\nMessage: ${technicalError}`,
               [{ text: 'Retry', onPress: () => handleLogin() }, { text: 'OK' }]
             );
           }
@@ -167,18 +154,14 @@ export default function LoginScreen() {
         }
 
         if (data?.session) {
-          console.log("[Auth] Step 3: Auth Success. Verifying session storage...");
           setLoginSuccess(true);
         }
       } catch (err: any) {
-        console.error("[Auth] CRITICAL CRASH:", err);
-        Alert.alert('App Crash', `A critical error occurred: ${err.message}`);
+        const duration = Date.now() - startTime;
+        Alert.alert('Protocol Error', `Status: 0\nDuration: ${duration}ms\nTrace: ${err.message}`);
         setLoading(false);
       }
     };
-
-    await performSignIn(0);
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
