@@ -11,8 +11,8 @@ const sanitizeUrl = (url: string) => {
   return url;
 };
 
-const supabaseUrl = 'https://tzpmsylelpqzjmfvabga.supabase.co';
-const supabaseAnonKey = 'sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__';
+const supabaseUrl = 'https://juozeonesytttmaizdso.supabase.co';
+const supabaseAnonKey = 'sb_publishable__Xiil3pRsK_lcEnv8dEulQ_Saz4tJSU';
 
 /**
  * Robust Fetch wrapper with retries and timeouts to handle mobile network instability.
