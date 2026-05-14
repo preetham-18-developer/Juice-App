@@ -1,4 +1,4 @@
-export type Category = 'juice' | 'fruit';
+export type Category = 'juice' | 'fruit' | 'vegetable' | 'other';
 
 export interface Product {
   id: string;
@@ -10,6 +10,7 @@ export interface Product {
   price_per_kg?: number;
   price?: number;
   stock_kg?: number;
+  rating?: number;
 }
 
 export interface JuiceVariant {
@@ -25,7 +26,7 @@ export interface Order {
   id: string;
   user_id: string;
   total_amount: number;
-  status: 'received' | 'processing' | 'completed' | 'cancelled';
+  status: 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'PACKED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'RECEIVED' | 'received' | 'processing' | 'completed' | 'cancelled';
   payment_type: 'online' | 'cod';
   payment_status: string;
   delivery_type: 'delivery' | 'pickup';

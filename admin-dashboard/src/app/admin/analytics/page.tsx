@@ -23,8 +23,7 @@ import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { useRealtime } from '@/hooks/useRealtime';
-import { useAppStore } from '@/store/useStore';
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
+import { format, eachMonthOfInterval, subMonths } from 'date-fns';
 
 // Dynamic imports for charts to prevent hydration issues
 const AreaChart = dynamic(() => import('recharts').then(mod => mod.AreaChart), { ssr: false });
@@ -34,8 +33,6 @@ const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: fa
 const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
 const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
 const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
-const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false });
-const Bar = dynamic(() => import('recharts').then(mod => mod.Bar), { ssr: false });
 const Cell = dynamic(() => import('recharts').then(mod => mod.Cell), { ssr: false });
 const PieChart = dynamic(() => import('recharts').then(mod => mod.PieChart), { ssr: false });
 const Pie = dynamic(() => import('recharts').then(mod => mod.Pie), { ssr: false });
@@ -43,6 +40,7 @@ const Pie = dynamic(() => import('recharts').then(mod => mod.Pie), { ssr: false 
 const COLORS = ['#84cc16', '#f97316', '#3b82f6', '#8b5cf6'];
 
 const AnalyticsPage = () => {
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     revenue: 0,
@@ -50,19 +48,17 @@ const AnalyticsPage = () => {
     customers: 0,
     avgOrderValue: 0
   });
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
-  const [orderStatusData, setOrderStatusData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<{name: string, revenue: number, orders: number}[]>([]);
+  const [topProducts, setTopProducts] = useState<{name: string, sales: number, revenue: number, image: string}[]>([]);
+  const [orderStatusData, setOrderStatusData] = useState<{name: string, value: number}[]>([]);
 
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, []);
-
-  // REALTIME AUTO-REFRESH
-  useRealtime([
-    { table: 'orders', callback: () => fetchAnalyticsData(true) },
-    { table: 'profiles', callback: () => fetchAnalyticsData(true) }
-  ]);
+  interface AnalyticsOrder {
+    id: string;
+    created_at: string;
+    total_amount: number;
+    status: string;
+    user_id: string;
+  }
 
   const isFetching = React.useRef(false);
 
@@ -80,10 +76,10 @@ const AnalyticsPage = () => {
         .order('created_at', { ascending: false });
       
       if (ordersError) throw ordersError;
-      const allOrders = (orders as any[]) || [];
+      const allOrders = (orders as AnalyticsOrder[]) || [];
 
       // 2. Fetch Customer Count - More efficiently
-      const uniqueCustomers = new Set(allOrders.map((o: any) => o.user_id)).size || 0;
+      const uniqueCustomers = new Set(allOrders.map((o) => o.user_id)).size || 0;
 
       // 3. Fetch Top Products - Specific columns
       const { data: orderItems, error: itemsError } = await supabase
@@ -96,11 +92,11 @@ const AnalyticsPage = () => {
       
       // Stats
       let totalRevenue = 0;
-      const statusCounts: any = {};
+      const statusCounts: Record<string, number> = {};
       
       allOrders?.forEach(order => {
         totalRevenue += Number(order.total_amount || 0);
-        const status = order.status || 'pending';
+        const status = (order.status as string) || 'pending';
         statusCounts[status] = (statusCounts[status] || 0) + 1;
       });
 
@@ -136,21 +132,22 @@ const AnalyticsPage = () => {
       setChartData(monthlyData);
 
       // Top Products processing
-      const productMap: Record<string, any> = {};
-      orderItems?.forEach((item: any) => {
+      const productMap: Record<string, { name: string, sales: number, revenue: number, image: string }> = {};
+      orderItems?.forEach((item: { quantity: number, subtotal: number, products: any }) => {
         const product = item.products;
-        if (!product?.name) return;
+        const prod = Array.isArray(product) ? product[0] : product;
+        if (!prod?.name) return;
         
-        if (!productMap[product.name]) {
-          productMap[product.name] = { 
-            name: product.name, 
+        if (!productMap[prod.name]) {
+          productMap[prod.name] = { 
+            name: prod.name, 
             sales: 0, 
             revenue: 0, 
-            image: product.image_url 
+            image: prod.image_url 
           };
         }
-        productMap[product.name].sales += Number(item.quantity) || 0;
-        productMap[product.name].revenue += Number(item.subtotal) || 0;
+        productMap[prod.name].sales += Number(item.quantity) || 0;
+        productMap[prod.name].revenue += Number(item.subtotal) || 0;
       });
 
       const sortedProducts = Object.values(productMap)
@@ -175,7 +172,18 @@ const AnalyticsPage = () => {
     }
   };
 
-  if (loading) {
+  useEffect(() => {
+    setMounted(true);
+    fetchAnalyticsData();
+  }, []);
+
+  // REALTIME AUTO-REFRESH
+  useRealtime([
+    { table: 'orders', callback: () => fetchAnalyticsData(true) },
+    { table: 'profiles', callback: () => fetchAnalyticsData(true) }
+  ]);
+
+  if (!mounted || loading) {
     return (
       <AdminLayout>
         <div className="h-[70vh] flex flex-col items-center justify-center">

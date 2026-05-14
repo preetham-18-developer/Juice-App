@@ -1,46 +1,46 @@
 "use client";
- 
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Search, 
-  Filter, 
+  Users, 
+  UserPlus, 
   MoreVertical, 
   Mail, 
   Phone, 
-  Users,
-  ShoppingCart, 
-  IndianRupee,
   Calendar,
-  Eye,
+  IndianRupee,
+  Activity,
+  ArrowUpRight,
+  Loader2,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
-  UserX,
-  MessageSquare,
-  Loader2
+  Filter,
+  Package
 } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import Skeleton from '@/components/ui/Skeleton';
 import { useRealtime } from '@/hooks/useRealtime';
+import Skeleton from '@/components/ui/Skeleton';
 
 interface Customer {
   id: string;
-  name: string;
+  full_name: string;
   email: string;
   phone: string;
-  orders: number;
-  spent: number;
-  joined: string;
-  status: string;
+  created_at: string;
+  total_orders: number;
+  ltv: number;
+  last_order: string | null;
 }
 
-const CustomersPage = () => {
+export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [displayLimit, setDisplayLimit] = useState(10);
   const [stats, setStats] = useState({
@@ -49,7 +49,66 @@ const CustomersPage = () => {
     avgLTV: 0
   });
 
+  const fetchCustomers = async (isBackground = false) => {
+    try {
+      if (!isBackground) setLoading(true);
+
+      // Parallel Fetching
+      const [profilesResult, ordersResult] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('orders').select('id, user_id, total_amount, created_at')
+      ]);
+
+      if (profilesResult.error) throw profilesResult.error;
+      if (ordersResult.error) throw ordersResult.error;
+
+      const profiles = profilesResult.data || [];
+      const allOrders = ordersResult.data || [];
+
+      // Create Order Analytics Map
+      const orderStatsMap = allOrders.reduce((acc, order) => {
+        if (!acc[order.user_id]) {
+          acc[order.user_id] = { count: 0, total: 0, lastOrder: order.created_at };
+        }
+        acc[order.user_id].count += 1;
+        acc[order.user_id].total += Number(order.total_amount || 0);
+        if (new Date(order.created_at) > new Date(acc[order.user_id].lastOrder)) {
+          acc[order.user_id].lastOrder = order.created_at;
+        }
+        return acc;
+      }, {} as Record<string, { count: number; total: number; lastOrder: string }>);
+
+      const formatted = profiles.map(profile => ({
+        id: profile.id,
+        full_name: profile.full_name || 'Anonymous Customer',
+        email: profile.email || 'N/A',
+        phone: profile.phone || 'N/A',
+        created_at: profile.created_at,
+        total_orders: orderStatsMap[profile.id]?.count || 0,
+        ltv: orderStatsMap[profile.id]?.total || 0,
+        last_order: orderStatsMap[profile.id]?.lastOrder || null
+      }));
+
+      setCustomers(formatted);
+
+      // Calculate Stats
+      const total = formatted.length;
+      const active = formatted.filter(c => c.total_orders > 0).length;
+      const avgLTV = total > 0 ? formatted.reduce((acc, c) => acc + c.ltv, 0) / total : 0;
+
+      setStats({ total, active, avgLTV });
+
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error fetching customers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
     fetchCustomers();
   }, []);
 
@@ -59,267 +118,177 @@ const CustomersPage = () => {
     { table: 'orders', callback: () => fetchCustomers(true) }
   ]);
 
-  const fetchCustomers = async (isBackground = false) => {
-    try {
-      if (!isBackground) setLoading(true);
-
-      // Parallel Fetching
-      const [profilesResult, ordersResult] = await Promise.all([
-        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-        supabase.from('orders').select('*')
-      ]);
-      
-      const profiles = profilesResult.data;
-      const orders = ordersResult.data;
-
-      if (profilesResult.error) throw profilesResult.error;
-      if (ordersResult.error) throw ordersResult.error;
-
-      // Process data
-      const orderStats = orders?.reduce((acc: any, curr: any) => {
-        const userId = curr.user_id;
-        if (!acc[userId]) acc[userId] = { count: 0, total: 0 };
-        acc[userId].count += 1;
-        // Resilient amount check
-        const amount = Number(curr.total_amount || curr.total_price || curr.amount || 0);
-        acc[userId].total += amount;
-        return acc;
-      }, {});
-
-      const formattedCustomers: Customer[] = (profiles || []).map(profile => ({
-        id: profile.id,
-        name: profile.full_name || 'Anonymous Customer',
-        email: profile.email || 'No Email',
-        phone: profile.phone || 'No Phone',
-        orders: orderStats?.[profile.id]?.count || 0,
-        spent: orderStats?.[profile.id]?.total || 0,
-        joined: format(new Date(profile.created_at), 'dd MMM yyyy'),
-        status: 'active'
-      }));
-
-      setCustomers(formattedCustomers);
-
-      const totalSpent = orders?.reduce((acc: any, curr: any) => acc + Number(curr.total_amount || curr.total_price || curr.amount || 0), 0) || 0;
-      const totalProfiles = profiles?.length || 0;
-
-      setStats({
-        total: totalProfiles,
-        active: Math.floor(totalProfiles * 0.4), // Simulated active count for demo, since we don't have session data
-        avgLTV: totalProfiles > 0 ? totalSpent / totalProfiles : 0
-      });
-
-    } catch (err) {
-      console.error('Error fetching customers:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.phone.toLowerCase().includes(searchTerm.toLowerCase())
+    c.phone.includes(searchTerm)
   );
 
   const displayedCustomers = filteredCustomers.slice(0, displayLimit);
+
+  if (!mounted || (loading && customers.length === 0)) {
+    return (
+      <AdminLayout>
+        <div className="h-[70vh] flex flex-col items-center justify-center">
+          <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+          <p className="text-slate-500 font-bold animate-pulse">Loading Customer Database...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
       {/* Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Customer Base</h1>
-          <p className="text-slate-500">Real-time management of your registered users</p>
+          <h1 className="text-2xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight">CRM</h1>
+          <p className="text-sm lg:text-base text-slate-500 font-medium">Customer relationship & lifecycle management</p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all">
-            <Mail size={18} />
-            <span>Send Email</span>
-          </button>
-          <button 
-            onClick={() => fetchCustomers()}
-            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
-          >
-            <MessageSquare size={18} />
-            <span>Sync Live</span>
-          </button>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="card-premium p-2 flex-1 md:w-80 flex items-center gap-3">
+            <Search className="text-slate-400 ml-2" size={20} />
+            <input 
+              type="text" 
+              placeholder="Search by name, email or phone..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none outline-none text-sm font-medium w-full"
+            />
+          </div>
         </div>
       </div>
 
-      {/* CRM Stats Grid */}
+      {/* Stats Quick View */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <div className="card-premium p-6 flex items-center gap-6">
-          <div className="w-16 h-16 bg-blue-500/10 rounded-3xl flex items-center justify-center text-blue-500">
-            <Users size={32} />
+        <div className="card-premium p-6 flex items-center gap-5">
+          <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500">
+            <Users size={28} />
           </div>
           <div>
-            <p className="text-slate-500 font-medium text-sm mb-1">Total Registered</p>
-            {loading ? <Skeleton className="h-8 w-16" /> : <h3 className="text-2xl font-black text-slate-900 dark:text-white">{stats.total}</h3>}
-            <p className="text-xs text-emerald-500 font-bold mt-1">Live from Database</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Registered</p>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white">{stats.total}</h3>
           </div>
         </div>
-        <div className="card-premium p-6 flex items-center gap-6">
-          <div className="w-16 h-16 bg-emerald-500/10 rounded-3xl flex items-center justify-center text-emerald-500">
-            <ShieldCheck size={32} />
+        <div className="card-premium p-6 flex items-center gap-5">
+          <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500">
+            <Activity size={28} />
           </div>
           <div>
-            <p className="text-slate-500 font-medium text-sm mb-1">Estimated Active</p>
-            {loading ? <Skeleton className="h-8 w-16" /> : <h3 className="text-2xl font-black text-slate-900 dark:text-white">{stats.active}</h3>}
-            <p className="text-xs text-slate-400 font-bold mt-1">Based on engagement</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Buyers</p>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white">{stats.active}</h3>
           </div>
         </div>
-        <div className="card-premium p-6 flex items-center gap-6">
-          <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center text-primary">
-            <IndianRupee size={32} />
+        <div className="card-premium p-6 flex items-center gap-5">
+          <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500">
+            <IndianRupee size={28} />
           </div>
           <div>
-            <p className="text-slate-500 font-medium text-sm mb-1">Avg. Lifetime Value</p>
-            {loading ? <Skeleton className="h-8 w-24" /> : <h3 className="text-2xl font-black text-slate-900 dark:text-white">₹{stats.avgLTV.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>}
-            <p className="text-xs text-emerald-500 font-bold mt-1">Revenue per user</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Avg Lifetime Value</p>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white">₹{stats.avgLTV.toFixed(0)}</h3>
           </div>
         </div>
-      </div>
-
-      {/* Filters Bar */}
-      <div className="card-premium p-4 mb-8 flex flex-col md:flex-row items-center gap-4">
-        <div className="relative flex-1 group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by name, email or phone..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-transparent rounded-xl focus:border-primary/20 focus:ring-4 focus:ring-primary/5 outline-none transition-all font-medium text-xs"
-          />
-        </div>
-        <button className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-slate-500 hover:text-primary transition-colors">
-          <Filter size={20} />
-        </button>
       </div>
 
       {/* Customers Table */}
-      <div className="card-premium overflow-hidden">
+      <div className="card-premium overflow-hidden mb-8">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 text-xs font-bold uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                <th className="px-6 py-5">Customer</th>
-                <th className="px-6 py-5">Contact Info</th>
+              <tr className="bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
+                <th className="px-6 py-5">Customer Info</th>
+                <th className="px-6 py-5">Contact</th>
                 <th className="px-6 py-5">Activity</th>
-                <th className="px-6 py-5">Spent</th>
-                <th className="px-6 py-5">Status</th>
+                <th className="px-6 py-5">Lifetime Value</th>
                 <th className="px-6 py-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {loading ? (
-                [1, 2, 3, 4, 5].map(i => (
-                  <tr key={i}>
-                    <td className="px-6 py-4"><div className="flex items-center gap-4"><Skeleton className="w-12 h-12 rounded-2xl" /><div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-3 w-16" /></div></div></td>
-                    <td className="px-6 py-4"><div className="space-y-2"><Skeleton className="h-3 w-32" /><Skeleton className="h-3 w-28" /></div></td>
-                    <td className="px-6 py-4"><Skeleton className="h-8 w-20 rounded-xl" /></td>
-                    <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
-                    <td className="px-6 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
-                    <td className="px-6 py-4"><Skeleton className="h-8 w-8 rounded-lg float-right" /></td>
-                  </tr>
-                ))
-              ) : displayedCustomers.map((user) => (
-                <tr key={user.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all duration-200 will-change-transform">
-                  <td className="px-6 py-4">
+              {displayedCustomers.map((customer) => (
+                <tr key={customer.id} className="group hover:bg-slate-50/30 transition-all">
+                  <td className="px-6 py-5">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-emerald-500/20 flex items-center justify-center text-primary font-black text-lg">
-                        {user.name.charAt(0)}
+                      <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs">
+                        {customer.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                       </div>
                       <div>
-                        <p className="font-bold text-slate-800 dark:text-slate-200">{user.name}</p>
-                        <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                          <Calendar size={10} />
-                          Joined {user.joined}
-                        </p>
+                        <p className="font-bold text-slate-900 dark:text-white">{customer.full_name}</p>
+                        <p className="text-xs text-slate-500">Joined {format(new Date(customer.created_at), 'MMM yyyy')}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                        <Mail size={14} className="text-primary/50" />
-                        {user.email}
-                      </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                        <Phone size={14} className="text-primary/50" />
-                        {user.phone}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500">
-                        <ShoppingCart size={16} />
+                  <td className="px-6 py-5">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                        <Mail size={14} className="text-slate-300" />
+                        {customer.email}
                       </div>
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{user.orders} Orders</p>
+                      <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                        <Phone size={14} className="text-slate-300" />
+                        {customer.phone}
+                      </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-slate-900 dark:text-white">₹{user.spent.toLocaleString()}</p>
-                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Lifetime Value</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn(
-                      "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-600"
-                    )}>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button className="p-2 text-slate-400 hover:text-primary hover:bg-accent/30 rounded-lg transition-all">
-                        <Eye size={18} />
-                      </button>
-                      <button className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all">
-                        <UserX size={18} />
-                      </button>
-                      <button className="p-2 text-slate-400 hover:text-slate-600 rounded-lg">
-                        <MoreVertical size={18} />
-                      </button>
+                  <td className="px-6 py-5">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                        <Package size={14} className="text-primary" />
+                        {customer.total_orders} Orders
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        Last: {customer.last_order ? formatDistanceToNow(new Date(customer.last_order)) + ' ago' : 'Never'}
+                      </p>
                     </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-slate-900 dark:text-white">₹{customer.ltv.toLocaleString()}</span>
+                      <div className="h-1.5 w-24 bg-slate-100 dark:bg-slate-800 rounded-full mt-1.5 overflow-hidden">
+                        <div 
+                          className="h-full bg-primary" 
+                          style={{ width: `${Math.min((customer.ltv / (stats.avgLTV * 2)) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <button className="p-2 text-slate-300 hover:text-primary transition-colors">
+                      <MoreVertical size={20} />
+                    </button>
                   </td>
                 </tr>
               ))}
+              
+              {displayedCustomers.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-20 text-center">
+                    <div className="max-w-xs mx-auto">
+                      <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center justify-center text-slate-300 mx-auto mb-4">
+                        <Users size={32} />
+                      </div>
+                      <p className="text-slate-500 font-bold">No customers found matching your search criteria.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-        
-        {/* Pagination & Load More */}
-        {!loading && filteredCustomers.length > 0 && (
-          <div className="px-6 py-6 bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-slate-500 font-medium order-2 sm:order-1">
-              Showing <span className="text-slate-900 dark:text-white font-bold">{displayedCustomers.length}</span> of <span className="text-slate-900 dark:text-white font-bold">{filteredCustomers.length}</span> customers
-            </p>
-            
-            <div className="flex items-center gap-3 order-1 sm:order-2">
-              {displayLimit < filteredCustomers.length && (
-                <button 
-                  onClick={() => setDisplayLimit(prev => prev + 10)}
-                  className="px-6 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-black hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
-                >
-                  Load More
-                </button>
-              )}
-              <div className="flex items-center gap-1">
-                <button className="p-2 text-slate-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all border border-transparent hover:border-slate-200 disabled:opacity-30" disabled>
-                  <ChevronLeft size={20} />
-                </button>
-                <button className="p-2 text-slate-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all border border-transparent hover:border-slate-200 disabled:opacity-30" disabled>
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Pagination */}
+      {!loading && filteredCustomers.length > displayLimit && (
+        <div className="flex justify-center pb-10">
+          <button 
+            onClick={() => setDisplayLimit(prev => prev + 10)}
+            className="px-8 py-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl font-black text-xs hover:bg-primary hover:text-white transition-all shadow-sm flex items-center gap-2"
+          >
+            Load More Customers
+            <ArrowUpRight size={16} />
+          </button>
+        </div>
+      )}
     </AdminLayout>
   );
-};
- 
-export default CustomersPage;
+}

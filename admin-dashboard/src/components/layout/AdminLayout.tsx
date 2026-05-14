@@ -24,7 +24,7 @@ import { Toaster } from '@/components/ui/Toaster';
 import { toast } from '@/hooks/use-toast';
 import { useTheme } from 'next-themes';
 
-const AdminLayout = ({ children }: { children: React.ReactNode }) => {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isOpenMobile, setIsOpenMobile] = useState(false);
@@ -36,6 +36,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -118,8 +119,10 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
           useAppStore.getState().setCurrentStore({
             id: 'default',
             name: 'Main Store',
-            location: 'Digital Shop'
-          } as any);
+            location: 'Digital Shop',
+            image_url: '',
+            status: 'open'
+          });
         }
         
         isInitialized.current = true;
@@ -265,6 +268,4 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
       <Toaster />
     </div>
   );
-};
-
-export default AdminLayout;
+}

@@ -132,8 +132,9 @@ export const useCartStore = create<CartStore>()(
 
           set({ deliveryFee: fee });
           return fee;
-        } catch (err: any) {
-          console.warn('[CartStore] Delivery validation failed:', err.message);
+        } catch (err: unknown) {
+          const error = err as Error;
+          console.warn('[CartStore] Delivery validation failed:', error.message);
           set({ deliveryFee: 0 });
           throw err;
         }
@@ -178,8 +179,9 @@ export const useCartStore = create<CartStore>()(
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
             return data.order_id;
-          } catch (error: any) {
-            const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+          } catch (err: unknown) {
+            const error = err as Error;
+            const errorMessage = error.message || JSON.stringify(err);
             monitor.log('ERROR', 'Checkout', 'Order placement failed', { 
               message: errorMessage,
               stack: error.stack 

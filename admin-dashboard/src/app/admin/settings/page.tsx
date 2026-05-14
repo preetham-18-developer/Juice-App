@@ -3,18 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Settings, 
   User, 
   Store, 
-  Bell, 
-  Shield, 
-  Key, 
-  Smartphone,
-  Cloud,
   Save,
   Camera,
   IndianRupee,
-  ExternalLink,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -34,7 +27,7 @@ const SettingsPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const { currentStore, user } = useAppStore();
+  const { user } = useAppStore();
   const [profile, setProfile] = useState({
     full_name: user?.name || '',
     phone: '',
@@ -54,10 +47,6 @@ const SettingsPage = () => {
     closing_time: '21:00',
     is_delivery_active: true
   });
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -102,6 +91,11 @@ const SettingsPage = () => {
     }
   };
 
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   const handleSave = async () => {
     setSubmitting(true);
     try {
@@ -144,8 +138,9 @@ const SettingsPage = () => {
       }
       
       setToast({ message: 'Settings saved successfully!', type: 'success' });
-    } catch (err: any) {
-      setToast({ message: err.message || 'Failed to save settings', type: 'error' });
+    } catch (err: unknown) {
+      const error = err as Error;
+      setToast({ message: error.message || 'Failed to save settings', type: 'error' });
     } finally {
       setSubmitting(false);
       setTimeout(() => setToast(null), 3000);
@@ -156,6 +151,17 @@ const SettingsPage = () => {
     { id: 'profile', label: 'Admin Profile', icon: User },
     { id: 'store', label: 'Store Details', icon: Store },
   ];
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="h-[70vh] flex flex-col items-center justify-center">
+          <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+          <p className="text-slate-500 font-bold animate-pulse">Loading settings...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -225,7 +231,7 @@ const SettingsPage = () => {
                 <div className="flex items-center gap-8">
                   <div className="relative">
                     <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-primary to-emerald-500 flex items-center justify-center text-white text-4xl font-black shadow-xl shadow-primary/20">
-                      A
+                      {profile.full_name.charAt(0) || 'A'}
                     </div>
                     <button className="absolute -bottom-2 -right-2 p-2 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 text-primary hover:scale-110 transition-transform">
                       <Camera size={18} />
@@ -408,69 +414,6 @@ const SettingsPage = () => {
                           className="w-full pl-12 pr-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-medium" 
                         />
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'api' && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="space-y-8"
-              >
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Payment Gateways</h3>
-                  <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-sm">
-                        <IndianRupee className="text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-800 dark:text-white">Razorpay</p>
-                        <p className="text-xs text-slate-500 font-medium">Standard Checkout Integration</p>
-                      </div>
-                    </div>
-                    <button className="px-4 py-2 bg-emerald-100 text-emerald-600 rounded-xl text-xs font-black uppercase tracking-widest">Active</button>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Razorpay Key ID</label>
-                      <input type="password" defaultValue="rzp_test_Sn7EB9DtuuYSVJ" className="w-full px-5 py-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-mono text-sm" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Razorpay Key Secret</label>
-                      <input type="password" defaultValue="••••••••••••••••••••••••" className="w-full px-5 py-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all font-mono text-sm" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-8 border-t border-slate-100 dark:border-slate-800">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Cloud Infrastructure</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-2 bg-white dark:bg-slate-800 rounded-xl">
-                          <Cloud size={24} className="text-blue-500" />
-                        </div>
-                        <ExternalLink size={16} className="text-slate-300" />
-                      </div>
-                      <p className="font-bold text-slate-800 dark:text-white">Cloudinary</p>
-                      <p className="text-xs text-slate-500 mb-4">Image Optimization & Storage</p>
-                      <button className="w-full py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-600 hover:text-primary transition-all">Configured</button>
-                    </div>
-                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-2 bg-white dark:bg-slate-800 rounded-xl">
-                          <Smartphone size={24} className="text-emerald-500" />
-                        </div>
-                        <ExternalLink size={16} className="text-slate-300" />
-                      </div>
-                      <p className="font-bold text-slate-800 dark:text-white">Twilio WhatsApp</p>
-                      <p className="text-xs text-slate-500 mb-4">Customer Notification Engine</p>
-                      <button className="w-full py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-600 hover:text-primary transition-all">Configured</button>
                     </div>
                   </div>
                 </div>

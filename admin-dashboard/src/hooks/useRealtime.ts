@@ -9,7 +9,7 @@ type RealtimeConfig = {
   event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
   schema?: string;
   filter?: string;
-  callback: (payload: RealtimePostgresChangesPayload<any>) => void;
+  callback: (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => void;
 };
 
 /**
@@ -23,6 +23,8 @@ export function useRealtime(configs: RealtimeConfig[]) {
   useEffect(() => {
     configsRef.current = configs;
   }, [configs]);
+
+  const configKey = JSON.stringify(configs.map(c => ({ table: c.table, event: c.event, filter: c.filter })));
 
   useEffect(() => {
     const channelName = `db-changes-${Math.random().toString(36).substring(7)}`;
@@ -38,20 +40,15 @@ export function useRealtime(configs: RealtimeConfig[]) {
           filter: configs[index].filter,
         },
         (payload) => {
-          // Always use the latest callback from the current configs
           configsRef.current[index]?.callback(payload);
         }
       );
     });
 
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        // Subscribed successfully
-      }
-    });
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []); // Only run once on mount
+  }, [configKey]); // eslint-disable-line react-hooks/exhaustive-deps
 }

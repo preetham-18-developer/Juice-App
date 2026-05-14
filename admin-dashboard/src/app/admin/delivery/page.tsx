@@ -4,19 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Truck, 
-  User, 
   MapPin, 
   Clock, 
   Search, 
-  Filter, 
-  ChevronRight,
+  CheckCircle2, 
+  Zap, 
+  Navigation, 
+  Bike,
   MoreVertical,
-  CheckCircle2,
-  AlertCircle,
-  Zap,
-  Navigation,
-  Phone,
-  Bike
+  Loader2
 } from 'lucide-react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
@@ -35,14 +31,36 @@ const deliveryStatuses = [
   { label: 'Delivered', value: 'delivered', color: 'bg-emerald-500' },
 ];
 
+interface DeliveryPartner {
+  id: string;
+  name: string;
+  phone?: string;
+  vehicle_type: string;
+  availability_status: string;
+}
+
+interface DeliveryOrder {
+  id: string;
+  user_id: string;
+  delivery_partner_id: string | null;
+  delivery_status: string;
+  created_at: string;
+  total_amount: number;
+  formatted_address: string;
+  customer?: { id: string; full_name: string; phone: string };
+  delivery_partner?: DeliveryPartner;
+}
+
 export default function DeliveryOrdersPage() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [partners, setPartners] = useState<any[]>([]);
+  const [orders, setOrders] = useState<DeliveryOrder[]>([]);
+  const [partners, setPartners] = useState<DeliveryPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'analytics'>('list');
 
   const fetchDeliveryData = async () => {
     try {
@@ -66,32 +84,35 @@ export default function DeliveryOrdersPage() {
         .eq('is_active', true);
 
       // Fetch Profiles for Orders
-      const userIds = Array.from(new Set(ordersData.map(o => o.user_id).filter(Boolean)));
+      const userIds = Array.from(new Set((ordersData || []).map(o => o.user_id).filter(Boolean)));
       const { data: profileData } = await supabase
         .from('profiles')
         .select('id, full_name, phone')
         .in('id', userIds);
       
-      const profileMap = (profileData || []).reduce((acc: any, p) => {
+      const profileMap = (profileData || []).reduce((acc: Record<string, { id: string; full_name: string; phone: string }>, p) => {
         acc[p.id] = p;
         return acc;
       }, {});
 
-      const enrichedOrders = ordersData.map(o => ({
+      const enrichedOrders = (ordersData || []).map(o => ({
         ...o,
         customer: profileMap[o.user_id]
       }));
 
       setOrders(enrichedOrders);
       setPartners(partnersData || []);
-    } catch (err) {
-      console.error('Error fetching delivery data:', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error fetching delivery data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
     fetchDeliveryData();
   }, []);
 
@@ -119,10 +140,11 @@ export default function DeliveryOrdersPage() {
         variant: "success",
       });
       fetchDeliveryData();
-    } catch (err) {
+    } catch (err: unknown) {
+      const error = err as Error;
       toast({
         title: "Assignment Failed",
-        description: "Could not assign partner. Try again.",
+        description: error.message || "Could not assign partner. Try again.",
         variant: "destructive",
       });
     } finally {
@@ -140,8 +162,9 @@ export default function DeliveryOrdersPage() {
       if (error) throw error;
       toast({ title: "Status Updated", description: `Order is now ${status.replace('_', ' ')}` });
       fetchDeliveryData();
-    } catch (err) {
-      toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast({ title: "Error", description: error.message || "Failed to update status", variant: "destructive" });
     }
   };
 
@@ -152,7 +175,7 @@ export default function DeliveryOrdersPage() {
     return matchesTab && matchesSearch;
   });
 
-  const [viewMode, setViewMode] = useState<'list' | 'analytics'>('list');
+  if (!mounted) return null;
 
   return (
     <AdminLayout>
@@ -191,9 +214,6 @@ export default function DeliveryOrdersPage() {
                 Analytics
               </button>
             </div>
-            <button className="px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-black text-sm hover:shadow-lg transition-all">
-              Manage Fleet
-            </button>
           </div>
         </div>
 
@@ -225,135 +245,132 @@ export default function DeliveryOrdersPage() {
               ))}
             </div>
 
-        {/* Main Table Section */}
-        <div className="card-premium overflow-hidden">
-          <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-between gap-4">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-              {deliveryStatuses.map(s => (
-                <button
-                  key={s.value}
-                  onClick={() => setActiveTab(s.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all",
-                    activeTab === s.value ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100"
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            
-            <div className="relative flex-1 md:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input 
-                type="text" 
-                placeholder="Find orders or customers..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-xs font-bold outline-none ring-primary/10 focus:ring-4 transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.1em] border-b border-slate-100 dark:border-slate-800">
-                  <th className="px-8 py-5">Order Details</th>
-                  <th className="px-8 py-5">Customer / Address</th>
-                  <th className="px-8 py-5">Logistics</th>
-                  <th className="px-8 py-5">Status</th>
-                  <th className="px-8 py-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {loading ? (
-                  [1, 2, 3].map(i => (
-                    <tr key={i}>
-                      <td className="px-8 py-6"><Skeleton className="h-10 w-32" /></td>
-                      <td className="px-8 py-6"><Skeleton className="h-10 w-48" /></td>
-                      <td className="px-8 py-6"><Skeleton className="h-10 w-32" /></td>
-                      <td className="px-8 py-6"><Skeleton className="h-8 w-24 rounded-full" /></td>
-                      <td className="px-8 py-6 text-right"><Skeleton className="h-10 w-24 ml-auto" /></td>
-                    </tr>
-                  ))
-                ) : filteredOrders.map((order) => (
-                  <tr key={order.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all">
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col">
-                        <span className="font-black text-slate-900 dark:text-white">#{order.id.slice(0, 8).toUpperCase()}</span>
-                        <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase flex items-center gap-1">
-                          <Clock size={10} /> {format(new Date(order.created_at), 'h:mm a')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col max-w-[250px]">
-                        <span className="font-bold text-slate-900 dark:text-white">{order.customer?.full_name || 'Guest User'}</span>
-                        <span className="text-xs text-slate-500 truncate flex items-center gap-1 mt-1">
-                          <MapPin size={12} className="text-primary" /> {order.formatted_address || 'No address provided'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      {order.delivery_partner ? (
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl flex items-center justify-center text-indigo-500">
-                            <Bike size={20} />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black text-slate-900 dark:text-white">{order.delivery_partner.name}</span>
-                            <span className="text-[10px] font-bold text-indigo-500 uppercase">Assigned</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <select 
-                          onChange={(e) => assignPartner(order.id, e.target.value)}
-                          className="bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 ring-primary/20 transition-all"
-                          defaultValue=""
-                        >
-                          <option value="" disabled>Assign Partner</option>
-                          {partners.map(p => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.vehicle_type})</option>
-                          ))}
-                        </select>
+            {/* Main Table Section */}
+            <div className="card-premium overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-between gap-4">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                  {deliveryStatuses.map(s => (
+                    <button
+                      key={s.value}
+                      onClick={() => setActiveTab(s.value)}
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all",
+                        activeTab === s.value ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100"
                       )}
-                    </td>
-                    <td className="px-8 py-6">
-                      <span className={cn(
-                        "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider",
-                        order.delivery_status === 'delivered' ? "bg-emerald-100 text-emerald-600" :
-                        order.delivery_status === 'out_for_delivery' ? "bg-indigo-100 text-indigo-600" :
-                        "bg-amber-100 text-amber-600"
-                      )}>
-                        {order.delivery_status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                       <div className="flex items-center justify-end gap-2">
-                          <button 
-                            onClick={() => {
-                              const nextMap: any = { 'pending': 'preparing', 'preparing': 'out_for_delivery', 'out_for_delivery': 'delivered' };
-                              const next = nextMap[order.delivery_status];
-                              if (next) updateDeliveryStatus(order.id, next);
-                            }}
-                            className="p-2.5 bg-primary/10 text-primary rounded-xl hover:bg-primary hover:text-white transition-all shadow-sm"
-                          >
-                            <Zap size={18} />
-                          </button>
-                          <button className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-400 rounded-xl hover:text-slate-900 dark:hover:text-white transition-all">
-                            <MoreVertical size={18} />
-                          </button>
-                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        </React.Fragment>
-      }
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="relative flex-1 md:max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Find orders or customers..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-xs font-bold outline-none ring-primary/10 focus:ring-4 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.1em] border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-8 py-5">Order Details</th>
+                      <th className="px-8 py-5">Customer / Address</th>
+                      <th className="px-8 py-5">Logistics</th>
+                      <th className="px-8 py-5">Status</th>
+                      <th className="px-8 py-5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {loading && orders.length === 0 ? (
+                      [1, 2, 3].map(i => (
+                        <tr key={i}>
+                          <td className="px-8 py-6"><Skeleton className="h-10 w-32" /></td>
+                          <td className="px-8 py-6"><Skeleton className="h-10 w-48" /></td>
+                          <td className="px-8 py-6"><Skeleton className="h-10 w-32" /></td>
+                          <td className="px-8 py-6"><Skeleton className="h-8 w-24 rounded-full" /></td>
+                          <td className="px-8 py-6 text-right"><Skeleton className="h-10 w-24 ml-auto" /></td>
+                        </tr>
+                      ))
+                    ) : filteredOrders.map((order) => (
+                      <tr key={order.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all">
+                        <td className="px-8 py-6">
+                          <div className="flex flex-col">
+                            <span className="font-black text-slate-900 dark:text-white">#{order.id.slice(0, 8).toUpperCase()}</span>
+                            <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase flex items-center gap-1">
+                              <Clock size={10} /> {format(new Date(order.created_at), 'h:mm a')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex flex-col max-w-[250px]">
+                            <span className="font-bold text-slate-900 dark:text-white">{order.customer?.full_name || 'Guest User'}</span>
+                            <span className="text-xs text-slate-500 truncate flex items-center gap-1 mt-1">
+                              <MapPin size={12} className="text-primary" /> {order.formatted_address || 'No address provided'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          {order.delivery_partner ? (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl flex items-center justify-center text-indigo-500">
+                                <Bike size={20} />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-xs font-black text-slate-900 dark:text-white">{order.delivery_partner.name}</span>
+                                <span className="text-[10px] font-bold text-indigo-500 uppercase">Assigned</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <select 
+                              onChange={(e) => assignPartner(order.id, e.target.value)}
+                              className="bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 ring-primary/20 transition-all"
+                              defaultValue=""
+                            >
+                              <option value="" disabled>Assign Partner</option>
+                              {partners.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} ({p.vehicle_type})</option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-8 py-6">
+                          <span className={cn(
+                            "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+                            order.delivery_status === 'delivered' ? "bg-emerald-100 text-emerald-600" :
+                            order.delivery_status === 'out_for_delivery' ? "bg-indigo-100 text-indigo-600" :
+                            "bg-amber-100 text-amber-600"
+                          )}>
+                            {(order.delivery_status || 'Pending').replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                           <div className="flex items-center justify-end gap-2">
+                              <button 
+                                onClick={() => {
+                                  const nextMap: Record<string, string> = { 'pending': 'preparing', 'preparing': 'out_for_delivery', 'out_for_delivery': 'delivered' };
+                                  const next = nextMap[order.delivery_status];
+                                  if (next) updateDeliveryStatus(order.id, next);
+                                }}
+                                className="p-2.5 bg-primary/10 text-primary rounded-xl hover:bg-primary hover:text-white transition-all shadow-sm"
+                              >
+                                {assigningId === order.id ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+                              </button>
+                           </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </React.Fragment>
+        }
       </div>
     </AdminLayout>
   );

@@ -349,13 +349,13 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   title: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 30,
     fontWeight: '800',
     color: '#1e293b',
   },
   subtitle: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     color: '#64748b',
     textAlign: 'center',
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 18 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   label: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 14, 
     fontWeight: '700', 
     color: '#374151', 
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   inputSuccess: { borderColor: COLORS.primaryGreen, backgroundColor: '#f0fdf4' },
   errorContainer: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   input: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     flex: 1, 
     paddingVertical: 16, 
     marginLeft: 12, 
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   signupBtnText: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     color: '#FFFFFF', 
     fontSize: 17, 
     fontWeight: '900', 
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   successTitle: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 28,
     fontWeight: '900',
     color: '#1e293b',
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   emailHighlight: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.primaryGreen,

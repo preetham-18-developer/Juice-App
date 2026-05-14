@@ -1,4 +1,7 @@
 {
+  "cli": {
+    "appVersionSource": "remote"
+  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -13,7 +16,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://tzpmsylelpqzjmfvabga.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__",
         "EXPO_PUBLIC_API_URL": "https://juice-app-9uzq.onrender.com/api/payment",
-        "EXPO_PUBLIC_RAZORPAY_KEY": "rzp_test_Shgn1PuPVEOaBC"
+        "EXPO_PUBLIC_RAZORPAY_KEY": "rzp_test_Sn7EB9DtuuYSVJ"
       }
     },
     "production": {
@@ -22,7 +25,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://tzpmsylelpqzjmfvabga.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__",
         "EXPO_PUBLIC_API_URL": "https://juice-app-9uzq.onrender.com/api/payment",
-        "EXPO_PUBLIC_RAZORPAY_KEY": "rzp_test_Shgn1PuPVEOaBC"
+        "EXPO_PUBLIC_RAZORPAY_KEY": "rzp_test_Sn7EB9DtuuYSVJ"
       }
     }
   },

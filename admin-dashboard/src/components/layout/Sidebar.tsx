@@ -34,7 +34,7 @@ interface SidebarProps {
 
 interface MenuItem {
   name: string;
-  icon: any;
+  icon: React.ElementType;
   href: string;
   badge?: string | null;
 }
@@ -59,6 +59,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isOpenMobile, setIsOpenMobile }:
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -66,10 +67,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isOpenMobile, setIsOpenMobile }:
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
-                           (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
-                             ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
-                             : "http://localhost:8081");
+    const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "http://localhost:8081";
     window.location.href = `${CUSTOMER_APP_URL}/login`;
   };
 
@@ -103,10 +101,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isOpenMobile, setIsOpenMobile }:
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto custom-scrollbar">
         {dynamicMenuItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/admin/analytics' && pathname.startsWith(item.href));
+          // Ensure exact match for root items, or proper sub-route matching
+          const isActive = pathname === item.href || (pathname.startsWith(item.href + '/') && item.href !== '/admin');
           return (
             <Link 
               key={item.name} 

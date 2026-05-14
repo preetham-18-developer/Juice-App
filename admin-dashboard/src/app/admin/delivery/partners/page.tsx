@@ -5,16 +5,8 @@ import { motion } from 'framer-motion';
 import { 
   UserPlus, 
   Bike, 
-  Car, 
   Phone, 
-  Activity, 
   Trash2, 
-  Edit2, 
-  Search,
-  CheckCircle2,
-  XCircle,
-  MoreVertical,
-  Plus,
   Truck
 } from 'lucide-react';
 import AdminLayout from '@/components/layout/AdminLayout';
@@ -23,9 +15,21 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Skeleton from '@/components/ui/Skeleton';
 
+interface Partner {
+  id: string;
+  name: string;
+  phone: string;
+  vehicle_type: string;
+  vehicle_number: string;
+  availability_status: string;
+  total_earnings: number;
+  current_orders: number;
+}
+
 export default function DeliveryPartnersPage() {
-  const [partners, setPartners] = useState<any[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
   const [newPartner, setNewPartner] = useState({
@@ -34,10 +38,6 @@ export default function DeliveryPartnersPage() {
     vehicle_type: 'bike',
     vehicle_number: ''
   });
-
-  useEffect(() => {
-    fetchPartners();
-  }, []);
 
   const fetchPartners = async () => {
     try {
@@ -56,6 +56,12 @@ export default function DeliveryPartnersPage() {
     }
   };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+    fetchPartners();
+  }, []);
+
   const addPartner = async () => {
     if (!newPartner.name || !newPartner.phone) return;
     try {
@@ -68,8 +74,9 @@ export default function DeliveryPartnersPage() {
       setIsAdding(false);
       setNewPartner({ name: '', phone: '', vehicle_type: 'bike', vehicle_number: '' });
       fetchPartners();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -86,6 +93,8 @@ export default function DeliveryPartnersPage() {
       toast({ title: "Update Failed", variant: "destructive" });
     }
   };
+
+  if (!mounted) return null;
 
   return (
     <AdminLayout>

@@ -32,9 +32,10 @@ interface Category {
   item_count?: number;
 }
 
-const CategoriesPage = () => {
+export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -44,16 +45,6 @@ const CategoriesPage = () => {
   const [formData, setFormData] = useState({ name: '', image_url: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  // REALTIME AUTO-REFRESH
-  useRealtime([
-    { table: 'categories', callback: () => fetchCategories(true) },
-    { table: 'products', callback: () => fetchCategories(true) }
-  ]);
 
   const fetchCategories = async (isBackground = false) => {
     try {
@@ -81,10 +72,10 @@ const CategoriesPage = () => {
 
       if (prodError) throw prodError;
 
-      const counts = products.reduce((acc: any, curr) => {
+      const counts = (products || []).reduce((acc, curr) => {
         acc[curr.category] = (acc[curr.category] || 0) + 1;
         return acc;
-      }, {});
+      }, {} as Record<string, number>);
 
       const formatted = catData.map(cat => ({
         ...cat,
@@ -100,13 +91,26 @@ const CategoriesPage = () => {
       } else if (formatted.length > 0) {
         setSelectedCategory(formatted[0]);
       }
-    } catch (err: any) {
-      console.error('Error:', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error fetching categories:', error);
       if (!isBackground) setError('Using local category configuration.');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+    fetchCategories();
+  }, []);
+
+  // REALTIME AUTO-REFRESH
+  useRealtime([
+    { table: 'categories', callback: () => fetchCategories(true) },
+    { table: 'products', callback: () => fetchCategories(true) }
+  ]);
 
   const handleOpenAddModal = () => {
     setModalMode('add');
@@ -140,8 +144,9 @@ const CategoriesPage = () => {
       }
       setIsModalOpen(false);
       fetchCategories();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -158,8 +163,9 @@ const CategoriesPage = () => {
       toast({ title: 'Category removed', variant: 'success' });
       if (selectedCategory?.id === id) setSelectedCategory(null);
       fetchCategories();
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -377,6 +383,4 @@ const CategoriesPage = () => {
       </AnimatePresence>
     </AdminLayout>
   );
-};
-
-export default CategoriesPage;
+}

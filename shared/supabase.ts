@@ -26,11 +26,13 @@ const SharedStorageAdapter = {
       }
       return null;
     }
-    // Native (React Native / Expo) - Using eval to hide from web bundlers
+    // Native (React Native / Expo)
     try {
-      const SecureStore = eval('require')('expo-secure-store');
+      // In Expo, SecureStore is available via the package
+      const SecureStore = require('expo-secure-store');
       return await SecureStore.getItemAsync(key);
     } catch (e) {
+      console.warn('[Storage] Native SecureStore error:', e);
       return null;
     }
   },
@@ -42,9 +44,11 @@ const SharedStorageAdapter = {
       return;
     }
     try {
-      const SecureStore = eval('require')('expo-secure-store');
+      const SecureStore = require('expo-secure-store');
       await SecureStore.setItemAsync(key, value);
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[Storage] Native SecureStore error:', e);
+    }
   },
   removeItem: async (key: string) => {
     if (isWeb) {
@@ -54,9 +58,11 @@ const SharedStorageAdapter = {
       return;
     }
     try {
-      const SecureStore = eval('require')('expo-secure-store');
+      const SecureStore = require('expo-secure-store');
       await SecureStore.deleteItemAsync(key);
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[Storage] Native SecureStore error:', e);
+    }
   },
 };
 
@@ -81,11 +87,11 @@ export const supabase = getSupabase();
 /**
  * Unified safe query helper with retries and exponential backoff.
  */
-export const safeQuery = async <T = any>(
-  queryFn: () => PromiseLike<any>,
+export const safeQuery = async <T = unknown>(
+  queryFn: () => PromiseLike<{ data: T | null; error: unknown }>,
   retries = 3,
   delay = 500
-): Promise<{ data: T | null; error: any }> => {
+): Promise<{ data: T | null; error: unknown }> => {
   let lastError;
   const client = getSupabase();
   
@@ -94,10 +100,11 @@ export const safeQuery = async <T = any>(
       const result = await queryFn();
       if (result.error) throw result.error;
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err;
-      const isNetworkError = err.message?.toLowerCase().includes('network') || 
-                            err.message?.toLowerCase().includes('fetch');
+      const error = err as Error;
+      const isNetworkError = error.message?.toLowerCase().includes('network') || 
+                            error.message?.toLowerCase().includes('fetch');
       
       if (!isNetworkError || i === retries - 1) break;
       

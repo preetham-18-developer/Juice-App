@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -18,7 +18,6 @@ import {
 import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { useAppStore } from '@/store/useStore';
 
 const EditProductPage = () => {
   const router = useRouter();
@@ -41,12 +40,10 @@ const EditProductPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    if (id) fetchProduct();
-  }, [id]);
-
-  const fetchProduct = async () => {
+  const fetchProduct = useCallback(async () => {
+    if (!id) return;
     try {
       setFetching(true);
       const { data, error: fetchError } = await supabase
@@ -66,13 +63,22 @@ const EditProductPage = () => {
         setImageUrl(data.image_url);
         setIsActive(data.is_available);
       }
-    } catch (err: any) {
-      console.error('Error fetching product:', err);
-      setError(err.message || 'Failed to load product details.');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error fetching product:', error);
+      setError(error.message || 'Failed to load product details.');
     } finally {
       setFetching(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+    fetchProduct();
+  }, [fetchProduct]);
+
+  if (!mounted) return null;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,9 +114,10 @@ const EditProductPage = () => {
       }
 
       setImageUrl(data.secure_url);
-    } catch (err: any) {
-      console.error('Cloudinary upload error:', err);
-      setError(err.message || "Failed to upload image to Cloudinary.");
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Cloudinary upload error:', error);
+      setError(error.message || "Failed to upload image to Cloudinary.");
     } finally {
       setIsUploading(false);
     }
@@ -159,9 +166,10 @@ const EditProductPage = () => {
         router.push('/admin/products');
       }, 1500);
 
-    } catch (err: any) {
-      console.error('Error updating product:', err);
-      setError(err.message || 'Something went wrong while updating the product.');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error updating product:', error);
+      setError(error.message || 'Something went wrong while updating the product.');
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-// Version: 2026.05.13.01 - Force Vercel Refresh
-
+// Version: 2026.05.14.01 - Final Lint Fix
+ 
 const sanitizeUrl = (url: string) => {
   if (!url || url.includes('placeholder')) return url;
   if ((url.match(/http/g) || []).length > 1) {
@@ -52,7 +52,8 @@ export const getSupabase = (): SupabaseClient => {
   if (!supabaseInstance) {
     supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        storage: SharedStorageAdapter as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        storage: SharedStorageAdapter as any, // Cast to any to satisfy internal Supabase type constraints while maintaining cross-platform logic
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,
@@ -67,23 +68,23 @@ export const supabase = getSupabase();
 /**
  * Unified safe query helper with retries and exponential backoff.
  */
-export const safeQuery = async <T = any>(
-  queryFn: () => PromiseLike<any>,
+export const safeQuery = async <T = unknown>(
+  queryFn: () => PromiseLike<{ data: T | null; error: unknown }>,
   retries = 3,
   delay = 500
-): Promise<{ data: T | null; error: any }> => {
-  let lastError;
-  const client = getSupabase();
+): Promise<{ data: T | null; error: unknown }> => {
+  let lastError: unknown = null;
   
   for (let i = 0; i < retries; i++) {
     try {
       const result = await queryFn();
       if (result.error) throw result.error;
-      return result;
-    } catch (err: any) {
+      return result as { data: T | null; error: unknown };
+    } catch (err: unknown) {
       lastError = err;
-      const isNetworkError = err.message?.toLowerCase().includes('network') || 
-                            err.message?.toLowerCase().includes('fetch');
+      const error = err as Error;
+      const isNetworkError = error.message?.toLowerCase().includes('network') || 
+                            error.message?.toLowerCase().includes('fetch');
       
       if (!isNetworkError || i === retries - 1) break;
       

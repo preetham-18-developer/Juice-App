@@ -22,7 +22,7 @@ import {
 } from '@expo-google-fonts/cormorant-garamond';
 import { useFonts } from 'expo-font';
 import { supabase } from '../lib/supabase';
-import { Session } from '@supabase/supabase-js';
+import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../src/store/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
@@ -114,7 +114,7 @@ export default function RootLayout() {
     });
 
     // Listen for auth changes (runs async)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log(`[Auth] Event: ${event}, Session: ${session ? 'Active' : 'Null'}`);
       setSession(session);
       if (session?.user) {
@@ -124,26 +124,35 @@ export default function RootLayout() {
             if (error) console.warn('Role fetch error:', error);
             if (data?.role && data.role !== 'user') setUserRole(data.role);
           });
+          
+        // Re-setup notifications on login
+        setupGlobalNotifications(session.user.id);
       } else {
         setUserRole(null);
+        if (orderChannel) {
+          supabase.removeChannel(orderChannel);
+          orderChannel = null;
+        }
       }
     });
-    // GLOBAL CUSTOMER NOTIFICATIONS
-    let orderChannel: any;
 
-    async function setupGlobalNotifications() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    // GLOBAL CUSTOMER NOTIFICATIONS
+    let orderChannel: RealtimeChannel | null = null;
+
+    async function setupGlobalNotifications(userId: string) {
+      if (orderChannel) {
+        await supabase.removeChannel(orderChannel);
+      }
 
       orderChannel = supabase
-        .channel(`global_customer_orders_${user.id}`)
+        .channel(`global_customer_orders_${userId}`)
         .on(
           'postgres_changes',
           {
             event: 'UPDATE',
             schema: 'public',
             table: 'orders',
-            filter: `user_id=eq.${user.id}`,
+            filter: `user_id=eq.${userId}`,
           },
           (payload) => {
             const newStatus = payload.new.status;
@@ -157,10 +166,13 @@ export default function RootLayout() {
         .subscribe();
     }
 
-    setupGlobalNotifications();
+    // Initial setup if session already exists
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setupGlobalNotifications(user.id);
+    });
 
     return () => {
-      subscription.unsubscribe();
+      authSubscription.unsubscribe();
       if (orderChannel) supabase.removeChannel(orderChannel);
     };
   }, []);
@@ -214,7 +226,7 @@ export default function RootLayout() {
                   },
                   headerTintColor: '#10b981',
                   headerTitleStyle: {
-                    fontFamily: 'Calibri',
+                    fontFamily: 'Outfit_700Bold',
                     fontWeight: '700',
                   },
                   headerShadowVisible: false,
@@ -237,8 +249,8 @@ export default function RootLayout() {
                   <IntroSequence onComplete={() => setShowWebIntro(false)} />
                 </View>
               )}
+              <StatusBar style="auto" />
             </View>
-            <StatusBar style="auto" />
           </SafeAreaProvider>
         </ThemeProvider>
       </GestureHandlerRootView>

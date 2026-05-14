@@ -12,8 +12,15 @@ export const IntroSequence = ({ onComplete }: { onComplete: () => void }) => {
   const [phase, setPhase] = useState<'vaporize' | 'shimmer'>('vaporize');
 
   useEffect(() => {
+    if (Platform.OS !== 'web') {
+      onComplete();
+      return;
+    }
     // Check if intro has already played in this session to avoid annoyance on refresh
-    const hasSeenIntro = sessionStorage.getItem('hasSeenIntro');
+    let hasSeenIntro = null;
+    try {
+      hasSeenIntro = sessionStorage.getItem('hasSeenIntro');
+    } catch (e) {}
     if (hasSeenIntro) {
       onComplete();
       return;
@@ -24,7 +31,9 @@ export const IntroSequence = ({ onComplete }: { onComplete: () => void }) => {
     }, 2000);
 
     const timer2 = setTimeout(() => {
-      sessionStorage.setItem('hasSeenIntro', 'true');
+      try {
+        sessionStorage.setItem('hasSeenIntro', 'true');
+      } catch (e) {}
       onComplete();
     }, 4000);
 

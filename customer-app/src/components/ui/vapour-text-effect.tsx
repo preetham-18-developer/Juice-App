@@ -408,7 +408,7 @@ export const IntroComponent = () => {
             <VaporizeTextCycle
                 texts={["JUICY SHOP", "Fresh", "Pure"]}
                 font={{
-                    fontFamily: "Calibri",
+                    fontFamily: Platform.OS === 'ios' ? 'Outfit-Bold' : 'sans-serif',
                     fontSize: "80px",
                     fontWeight: 700
                 }}

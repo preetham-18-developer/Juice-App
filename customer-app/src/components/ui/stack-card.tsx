@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, Platform } from 'react-native';
 import Animated, { 
   useAnimatedStyle, 
   useSharedValue, 
@@ -15,7 +15,7 @@ const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = 300;
 const CARD_HEIGHT = 420;
 
-const Card = ({ item, index, scrollY, onPress }: { item: Product, index: number, scrollY: Animated.SharedValue<number>, onPress: () => void }) => {
+const Card = ({ item, index, scrollY, onPress }: { item: Product, index: number, scrollY: any, onPress: () => void }) => {
   const cardY = index * (CARD_HEIGHT - 60);
   
   const animatedStyle = useAnimatedStyle(() => {
@@ -140,14 +140,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 32,
     fontWeight: '900',
     color: COLORS.darkText,
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     color: COLORS.mutedGray,
     marginTop: 6,
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
   },
   productName: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 24,
     fontWeight: '900',
     color: '#FFFFFF',
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   buyText: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.primaryGreen,

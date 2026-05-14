@@ -311,7 +311,7 @@ export default function PaymentScreen() {
   };
 
   // ─── Render: Razorpay checkout (WebView / iframe) ───────────────────────
-  if (paymentState === 'OPENING_RAZORPAY' && orderId) {
+  if (paymentState === 'OPENING_RAZORPAY' && razorpayOrderId) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.webViewHeader}>

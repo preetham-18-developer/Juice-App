@@ -2,21 +2,21 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { 
+  Settings as SettingsIcon, 
+  MapPin, 
+  Navigation, 
+  Globe, 
+  Clock, 
+  Save, 
+  Loader2,
+  ShieldCheck,
+  AlertCircle
+} from 'lucide-react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  MapPin, 
-  Settings2, 
-  Save, 
-  Truck, 
-  Navigation, 
-  Zap, 
-  Globe,
-  AlertCircle,
-  Clock,
-  ShieldCheck
-} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
 // Dynamically import MapPicker to prevent SSR issues with Leaflet
@@ -25,12 +25,23 @@ const MapPicker = dynamic(() => import('@/components/delivery/MapPicker'), {
   loading: () => <div className="w-full h-full bg-slate-100 animate-pulse flex items-center justify-center rounded-3xl">Loading Map...</div>
 });
 
+interface Settings {
+  shop_latitude: number;
+  shop_longitude: number;
+  shop_address: string;
+  max_delivery_radius: number;
+  free_delivery_radius: number;
+  delivery_fee: number;
+  is_delivery_enabled: boolean;
+}
+
 export default function DeliverySettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
   
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<Settings>({
     shop_latitude: 19.0760,
     shop_longitude: 72.8777,
     shop_address: '',
@@ -39,10 +50,6 @@ export default function DeliverySettingsPage() {
     delivery_fee: 30,
     is_delivery_enabled: true
   });
-
-  useEffect(() => {
-    fetchSettings();
-  }, []);
 
   async function fetchSettings() {
     try {
@@ -64,12 +71,20 @@ export default function DeliverySettingsPage() {
           is_delivery_enabled: data.is_delivery_enabled ?? true
         });
       }
-    } catch (err: any) {
-      console.error('Error fetching settings:', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error(error);
+      toast({ title: "Fetch Failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+    fetchSettings();
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -77,162 +92,168 @@ export default function DeliverySettingsPage() {
       const { error } = await supabase
         .from('store_settings')
         .upsert({
-          id: (await supabase.from('store_settings').select('id').single()).data?.id || undefined,
+          id: (await supabase.from('store_settings').select('id').single()).data?.id,
           ...settings,
           updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
-
-      toast({
-        title: "Settings Saved",
-        description: "Your delivery configuration has been updated globally.",
-        variant: "success",
-      });
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message,
-        variant: "destructive"
-      });
+      toast({ title: "Settings Saved", variant: "success" });
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
 
+  if (!mounted) return null;
+
   return (
     <AdminLayout>
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-end mb-8">
+      <div className="space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Delivery Settings</h1>
-            <p className="text-slate-500 font-medium mt-1">Configure your shop hub and logistics perimeter</p>
+            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Delivery Infrastructure</h1>
+            <p className="text-slate-500 font-medium font-outfit tracking-wide">Configure store location and logistics parameters</p>
           </div>
           <button 
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-3 bg-primary text-white rounded-2xl font-black text-xs shadow-lg shadow-primary/20 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+            className="px-8 py-4 bg-primary text-white rounded-[2rem] font-black text-sm shadow-2xl shadow-primary/30 flex items-center gap-3 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
           >
-            {saving ? <Globe className="animate-spin" size={16} /> : <Save size={16} />}
-            SAVE CONFIGURATION
+            {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+            {saving ? 'UPDATING...' : 'SAVE SETTINGS'}
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Map */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="card-premium p-0 overflow-hidden h-[500px]">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          {/* Map Section */}
+          <div className="xl:col-span-2 space-y-6">
+            <div className="card-premium p-4 h-[500px] relative overflow-hidden bg-slate-50 border-2 border-slate-100 dark:border-slate-800">
               <MapPicker 
                 initialCenter={[settings.shop_latitude, settings.shop_longitude]}
                 radiusKm={settings.max_delivery_radius}
-                onLocationSelect={(lat, lng, addr) => {
+                onLocationSelect={(lat, lng, address) => {
                   setSettings(prev => ({ 
                     ...prev, 
                     shop_latitude: lat, 
                     shop_longitude: lng,
-                    shop_address: addr || prev.shop_address 
+                    shop_address: address || prev.shop_address 
                   }));
                 }}
               />
+              <div className="absolute top-8 left-8 z-[400] card-premium p-4 bg-white/90 backdrop-blur shadow-2xl border-none">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                    <MapPin size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Current Coordinates</p>
+                    <p className="text-xs font-black text-slate-900">{settings.shop_latitude.toFixed(4)}, {settings.shop_longitude.toFixed(4)}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="card-premium p-6 flex items-center gap-4 bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900">
-              <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                <ShieldCheck size={24} />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-black text-slate-900 dark:text-white text-sm uppercase tracking-wide">Dynamic Geo-Fencing Active</h4>
-                <p className="text-xs text-slate-500 font-medium">Orders outside the {settings.max_delivery_radius}km radius will be automatically blocked at checkout.</p>
-              </div>
+            <div className="card-premium p-8">
+              <h3 className="text-lg font-black text-slate-900 dark:text-white mb-6">Store Physical Address</h3>
+              <textarea 
+                value={settings.shop_address}
+                onChange={(e) => setSettings({ ...settings, shop_address: e.target.value })}
+                className="w-full p-5 bg-slate-50 dark:bg-slate-900 border-2 border-transparent focus:border-primary/20 rounded-3xl outline-none transition-all font-medium text-slate-700 dark:text-slate-200"
+                rows={3}
+                placeholder="Enter the full store address for customer reference..."
+              />
             </div>
           </div>
 
-          {/* Right Column: Controls */}
-          <div className="space-y-6">
-            <div className="card-premium p-6">
-              <div className="flex items-center gap-2 mb-6">
-                <Settings2 size={18} className="text-primary" />
-                <h3 className="font-black text-slate-900 dark:text-white uppercase text-xs tracking-widest">Logistics Controls</h3>
+          {/* Configuration Section */}
+          <div className="space-y-8">
+            <div className="card-premium p-8">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-primary/10 rounded-2xl text-primary">
+                  <Navigation size={24} />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Radius Control</h3>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-8">
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Shop Address</label>
-                  <textarea 
-                    value={settings.shop_address}
-                    onChange={(e) => setSettings({ ...settings, shop_address: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl text-xs font-bold focus:border-primary outline-none min-h-[80px]"
-                    placeholder="Enter shop address..."
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Max Radius (km)</label>
-                    <input 
-                      type="number"
-                      value={settings.max_delivery_radius}
-                      onChange={(e) => setSettings({ ...settings, max_delivery_radius: parseFloat(e.target.value) })}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl text-xs font-black"
-                    />
+                  <div className="flex justify-between mb-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Max Delivery Radius</label>
+                    <span className="text-sm font-black text-primary">{settings.max_delivery_radius} KM</span>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Free Radius (km)</label>
-                    <input 
-                      type="number"
-                      value={settings.free_delivery_radius}
-                      onChange={(e) => setSettings({ ...settings, free_delivery_radius: parseFloat(e.target.value) })}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl text-xs font-black"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Standard Delivery Fee (₹)</label>
                   <input 
-                    type="number"
-                    value={settings.delivery_fee}
-                    onChange={(e) => setSettings({ ...settings, delivery_fee: parseFloat(e.target.value) })}
-                    className="w-full px-4 py-3 bg-primary/5 border border-primary/20 rounded-xl text-sm font-black text-primary"
+                    type="range" min="1" max="50" step="1"
+                    value={settings.max_delivery_radius}
+                    onChange={(e) => setSettings({ ...settings, max_delivery_radius: parseInt(e.target.value) })}
+                    className="w-full accent-primary h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
                   />
-                  <p className="text-[10px] text-slate-400 font-bold mt-2 italic">*Applied to orders between {settings.free_delivery_radius}km and {settings.max_delivery_radius}km.</p>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div>
+                  <div className="flex justify-between mb-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Free Delivery Radius</label>
+                    <span className="text-sm font-black text-emerald-500">{settings.free_delivery_radius} KM</span>
+                  </div>
+                  <input 
+                    type="range" min="0" max={settings.max_delivery_radius} step="1"
+                    value={settings.free_delivery_radius}
+                    onChange={(e) => setSettings({ ...settings, free_delivery_radius: parseInt(e.target.value) })}
+                    className="w-full accent-emerald-500 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="card-premium p-8 bg-slate-900 text-white">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-white/10 rounded-2xl">
+                  <Globe size={24} />
+                </div>
+                <h3 className="text-xl font-black">Financials</h3>
+              </div>
+              
+              <div className="space-y-6">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Base Delivery Fee</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-500 text-lg">₹</span>
+                    <input 
+                      type="number"
+                      value={settings.delivery_fee}
+                      onChange={(e) => setSettings({ ...settings, delivery_fee: parseInt(e.target.value) })}
+                      className="w-full pl-10 pr-6 py-4 bg-white/10 border border-white/10 rounded-2xl outline-none font-black text-xl focus:border-primary transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/10">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Zap size={16} className={settings.is_delivery_enabled ? "text-emerald-500" : "text-slate-300"} />
-                      <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight">Delivery Service</span>
+                    <div>
+                      <h4 className="font-black text-sm">Accept Orders</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Master Delivery Switch</p>
                     </div>
                     <button 
                       onClick={() => setSettings({ ...settings, is_delivery_enabled: !settings.is_delivery_enabled })}
                       className={cn(
-                        "w-12 h-6 rounded-full transition-all relative",
-                        settings.is_delivery_enabled ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"
+                        "w-14 h-8 rounded-full relative transition-all duration-300",
+                        settings.is_delivery_enabled ? "bg-primary" : "bg-slate-700"
                       )}
                     >
                       <div className={cn(
-                        "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
-                        settings.is_delivery_enabled ? "right-1" : "left-1"
+                        "absolute top-1 w-6 h-6 bg-white rounded-full transition-all duration-300 shadow-lg",
+                        settings.is_delivery_enabled ? "left-7" : "left-1"
                       )} />
                     </button>
                   </div>
                 </div>
               </div>
             </div>
-
-            <div className="card-premium p-6 border-dashed border-2 border-slate-200 dark:border-slate-800 bg-transparent flex flex-col items-center text-center">
-              <Navigation size={32} className="text-slate-300 mb-4" />
-              <h5 className="font-black text-slate-400 uppercase text-[10px] tracking-widest">Realtime Sync</h5>
-              <p className="text-xs text-slate-400 font-medium mt-2 leading-relaxed">Changes saved here are instantly broadcasted to all customer apps without requiring a refresh.</p>
-            </div>
           </div>
         </div>
       </div>
     </AdminLayout>
   );
-}
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }

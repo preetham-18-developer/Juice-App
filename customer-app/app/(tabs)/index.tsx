@@ -126,14 +126,25 @@ export default function HomeScreen() {
         refreshing={refreshing}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        initialNumToRender={8}
+        
+        // Performance Optimizations
+        initialNumToRender={6}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+        getItemLayout={(_, index) => ({
+          length: 280, // Approximate height of PremiumCard
+          offset: 280 * index,
+          index,
+        })}
+        
         ListHeaderComponent={
           !searchQuery ? (
             <View style={{ marginBottom: 24 }}>
               {/* Premium Promo Banner */}
               <View style={styles.bannerContainer}>
                 <Image 
-                  source={{ uri: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80' }} // Placeholder or generated image URI
+                  source={{ uri: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=70' }} 
                   style={styles.bannerImage}
                   resizeMode="cover"
                 />
@@ -143,7 +154,7 @@ export default function HomeScreen() {
                   </View>
                   <Text style={styles.bannerTitle}>Stock up on{"\n"}daily essentials</Text>
                   <Text style={styles.bannerSubtitle}>Get farm-fresh goodness delivered in mins</Text>
-                  <TouchableOpacity style={styles.bannerBtn}>
+                  <TouchableOpacity style={styles.bannerBtn} activeOpacity={0.8}>
                     <Text style={styles.bannerBtnText}>Shop Now</Text>
                   </TouchableOpacity>
                 </View>
@@ -251,7 +262,7 @@ export default function HomeScreen() {
                   <TouchableOpacity 
                     key={opt.id}
                     style={[styles.sortBtn, selectedSort === opt.id && styles.sortBtnActive]}
-                    onPress={() => setSelectedSort(opt.id as any)}
+                    onPress={() => setSelectedSort(opt.id as 'popular' | 'price_low' | 'price_high')}
                   >
                     <Text style={[styles.sortText, selectedSort === opt.id && styles.sortTextActive]}>
                       {opt.label}
@@ -312,7 +323,7 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
-      } as any,
+      } as const,
       default: {
         elevation: 10,
         shadowColor: COLORS.primaryGreen,

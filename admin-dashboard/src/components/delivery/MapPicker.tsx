@@ -45,7 +45,7 @@ export default function MapPicker({ initialCenter, onLocationSelect, radiusKm = 
   const [markerPos, setMarkerPos] = useState<[number, number]>(initialCenter);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleMarkerDrag = (e: any) => {
+  const handleMarkerDrag = (e: L.DragEndEvent) => {
     const latlng = e.target.getLatLng();
     setMarkerPos([latlng.lat, latlng.lng]);
     onLocationSelect(latlng.lat, latlng.lng, "");

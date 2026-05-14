@@ -41,7 +41,7 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="space-y-4">
               <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Something went wrong</h1>
               <p className="text-slate-500 font-medium">
-                We encountered an unexpected error. Don't worry, your data is safe.
+                We encountered an unexpected error. Don&apos;t worry, your data is safe.
               </p>
               {this.state.error && (
                 <div className="p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl text-[10px] font-mono text-slate-400 text-left overflow-auto max-h-32">

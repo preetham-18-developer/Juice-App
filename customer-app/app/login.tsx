@@ -157,9 +157,10 @@ export default function LoginScreen() {
         if (data?.session) {
           setLoginSuccess(true);
         }
-      } catch (err: any) {
-        console.error("[Auth] performSignIn critical exception:", err);
-        const errorMessage = err?.message || 'Connection issue. Please try again.';
+      } catch (err: unknown) {
+        const error = err as Error;
+        console.error("[Auth] performSignIn critical exception:", error);
+        const errorMessage = error.message || 'Connection issue. Please try again.';
         const isNetworkError = errorMessage.toLowerCase().includes('network') || 
                               errorMessage.toLowerCase().includes('fetch');
 
@@ -389,7 +390,7 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     color: COLORS.white,
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 32,
     fontWeight: '900',
     textAlign: 'center',
@@ -408,13 +409,13 @@ const styles = StyleSheet.create({
   },
   successEmail: {
     color: COLORS.white,
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 14,
     fontWeight: '700',
   },
   successSubtitle: {
     color: 'rgba(255,255,255,0.8)',
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     textAlign: 'center',
     marginTop: 16,
@@ -464,13 +465,13 @@ const styles = StyleSheet.create({
   logoGradient: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   logo: { width: 70, height: 70, borderRadius: 35 },
   title: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 32, 
     color: '#064e3b', 
     fontWeight: '900' 
   },
   subtitle: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15, 
     color: '#065f46', 
     textAlign: 'center', 
@@ -481,13 +482,13 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 15 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   label: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 14, 
     color: '#374151', 
     fontWeight: '700' 
   },
   errorTextSmall: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 11, 
     color: '#ef4444', 
     fontWeight: '700' 
@@ -497,7 +498,7 @@ const styles = StyleSheet.create({
   inputSuccess: { borderColor: COLORS.primaryGreen, backgroundColor: '#f0fdf4' },
   errorContainer: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   input: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     flex: 1, 
     paddingVertical: 16, 
     marginLeft: 12, 
@@ -506,7 +507,7 @@ const styles = StyleSheet.create({
   },
   forgotBtn: { alignSelf: 'flex-end', marginTop: 10, paddingVertical: 4 },
   forgotText: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 13, 
     color: '#64748b', 
     fontWeight: '700' 
@@ -514,7 +515,7 @@ const styles = StyleSheet.create({
   loginBtnContainer: { marginTop: 25, borderRadius: 18, overflow: 'hidden', elevation: 8, shadowColor: '#10b981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12 },
   loginBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 18 },
   loginBtnText: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     color: '#FFFFFF', 
     fontSize: 17, 
     fontWeight: '900', 
@@ -523,7 +524,7 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 25 },
   footerText: { fontSize: 15, color: '#6b7280' },
   link: { 
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15, 
     color: '#059669', 
     fontWeight: '700' 

@@ -109,7 +109,7 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
   return (
     // OUTER: handles clean entrance — NO springify for better performance
     <Animated.View 
-      entering={isSearching ? undefined : FadeIn.duration(400).delay(delay)}
+      entering={isSearching ? undefined : FadeIn.duration(300).delay(Math.min(delay, 200))}
     >
       {/* INNER: handles subtle scale press transform */}
       <Animated.View style={[styles.container, animatedStyle]}>
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   ratingText: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 10,
     fontWeight: '800',
     color: COLORS.luxuryDark,

@@ -1,3 +1,4 @@
+/* eslint-env node */
 const { spawn } = require('child_process');
 
 const child = spawn('npx', ['eas-cli', 'login'], {

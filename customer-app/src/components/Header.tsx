@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Platform, TextInput, useWindowDimensions, ActivityIndicator } from 'react-native';
-import { COLORS, SPACING } from '../theme/colors';
+import { COLORS } from '../theme/colors';
 import { JuicyLogo } from './JuicyLogo';
 import { ShoppingCart, User, Search, X, MapPin, ChevronDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -18,6 +18,160 @@ interface HeaderProps {
   showSearch?: boolean;
 }
 
+/**
+ * Extracted Content to avoid duplication between BlurView (iOS) and standard View (Android)
+ */
+interface HeaderContentProps {
+  isDesktop: boolean;
+  isTablet: boolean;
+  searchValue: string;
+  onSearchChange?: (text: string) => void;
+  onSearchClear?: () => void;
+  onFilterPress?: () => void;
+  showSearch: boolean;
+  cartCount: number;
+  isFocused: boolean;
+  setIsFocused: (focused: boolean) => void;
+  locating: boolean;
+  address: any;
+  handleLocationPress: () => void;
+  handleIconPress: (route: string) => void;
+  router: any;
+}
+
+const HeaderContent = ({
+  isDesktop,
+  isTablet,
+  searchValue,
+  onSearchChange,
+  onSearchClear,
+  onFilterPress,
+  showSearch,
+  cartCount,
+  isFocused,
+  setIsFocused,
+  locating,
+  address,
+  handleLocationPress,
+  handleIconPress,
+  router,
+}: HeaderContentProps) => (
+  <View style={[styles.container, isDesktop && styles.containerDesktop]}>
+    {/* Main Layout Row */}
+    <View style={styles.mainRow}>
+      {/* Logo Section */}
+      <TouchableOpacity 
+        style={styles.logoSection} 
+        onPress={() => router.push('/')}
+        activeOpacity={0.8}
+      >
+        <JuicyLogo size={isDesktop ? 36 : 32} withText={false} />
+        {isDesktop && <Text style={styles.logoText}>Juicy</Text>}
+      </TouchableOpacity>
+
+      {/* Location Selector */}
+      <TouchableOpacity 
+        style={styles.locationContainer} 
+        activeOpacity={0.7}
+        onPress={handleLocationPress}
+        disabled={locating}
+      >
+        <View style={styles.locationIconBg}>
+          {locating ? (
+            <ActivityIndicator size="small" color={COLORS.primaryGreen} />
+          ) : (
+            <MapPin size={16} color={COLORS.primaryGreen} fill={COLORS.primaryGreen + '20'} />
+          )}
+        </View>
+        <View style={styles.locationInfo}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Text style={styles.locationLabel}>
+              {locating ? 'Locating...' : 'Delivery in 12 mins'}
+            </Text>
+            {!locating && <ChevronDown size={14} color={COLORS.darkText} />}
+          </View>
+          <Text style={styles.locationValue} numberOfLines={1}>
+            {address ? `${address.area || address.city} • Home` : 'Select Location • Home'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* LARGE SEARCH BAR - Desktop/Tablet Layout */}
+      {(isDesktop || isTablet) && showSearch && (
+        <View style={[
+          styles.searchContainer, 
+          styles.searchContainerLarge,
+          isFocused && styles.searchContainerFocused
+        ]}>
+          <Search size={20} color={isFocused ? COLORS.primaryGreen : COLORS.mutedGray} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for juices, fruits..."
+            placeholderTextColor={COLORS.mutedGray}
+            value={searchValue}
+            onChangeText={onSearchChange}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            autoCorrect={false}
+          />
+          {searchValue.length > 0 && (
+            <TouchableOpacity onPress={onSearchClear} style={styles.clearBtn}>
+              <X size={18} color={COLORS.mutedGray} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* Right Action Icons */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity 
+          style={styles.iconBtn} 
+          onPress={() => handleIconPress('/profile')}
+        >
+          <User size={24} color={COLORS.darkText} />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.iconBtn, styles.cartBtn]} 
+          onPress={() => handleIconPress('/(tabs)/cart')}
+        >
+          <ShoppingCart size={24} color={COLORS.white} />
+          {cartCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{cartCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+
+    {/* MOBILE SEARCH BAR - Second Row */}
+    {!isDesktop && !isTablet && showSearch && (
+      <View style={[
+        styles.searchRowMobile,
+        isFocused && styles.searchContainerFocused
+      ]}>
+        <Search size={18} color={isFocused ? COLORS.primaryGreen : COLORS.mutedGray} />
+        <TextInput
+          style={styles.searchInputMobile}
+          placeholder="Search 'fresh mangoes'..."
+          placeholderTextColor={COLORS.mutedGray}
+          value={searchValue}
+          onChangeText={onSearchChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          autoCorrect={false}
+        />
+        {searchValue.length > 0 && (
+          <TouchableOpacity onPress={onSearchClear} style={styles.clearBtn}>
+            <X size={16} color={COLORS.mutedGray} />
+          </TouchableOpacity>
+        )}
+      </View>
+    )}
+  </View>
+);
+
 export const Header: React.FC<HeaderProps> = ({
   searchValue = '',
   onSearchChange,
@@ -33,7 +187,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isFocused, setIsFocused] = useState(false);
 
   // Location Hook
-  const { address, loading: locating, fetchLocation, error: locationError } = useLocation();
+  const { address, loading: locating, fetchLocation } = useLocation();
 
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
@@ -52,133 +206,42 @@ export const Header: React.FC<HeaderProps> = ({
     fetchLocation();
   };
 
+  const contentProps = {
+    isDesktop,
+    isTablet,
+    searchValue,
+    onSearchChange,
+    onSearchClear,
+    onFilterPress,
+    showSearch,
+    cartCount,
+    isFocused,
+    setIsFocused,
+    locating,
+    address,
+    handleLocationPress,
+    handleIconPress,
+    router,
+  };
+
   return (
     <View style={[styles.outerContainer, { paddingTop: Math.max(insets.top, 8) }]}>
-      <BlurView intensity={Platform.OS === 'ios' ? 80 : 100} tint="light" style={styles.blurContainer}>
-        <View style={[styles.container, isDesktop && styles.containerDesktop]}>
-          
-          {/* Main Layout Row */}
-          <View style={styles.mainRow}>
-            {/* Logo Section */}
-            <TouchableOpacity 
-              style={styles.logoSection} 
-              onPress={() => router.push('/')}
-              activeOpacity={0.8}
-            >
-              <JuicyLogo size={isDesktop ? 36 : 32} withText={false} />
-              {isDesktop && <Text style={styles.logoText}>Juicy</Text>}
-            </TouchableOpacity>
-
-            {/* Location Selector */}
-            <TouchableOpacity 
-              style={styles.locationContainer} 
-              activeOpacity={0.7}
-              onPress={handleLocationPress}
-              disabled={locating}
-            >
-              <View style={styles.locationIconBg}>
-                {locating ? (
-                  <ActivityIndicator size="small" color={COLORS.primaryGreen} />
-                ) : (
-                  <MapPin size={16} color={COLORS.primaryGreen} fill={COLORS.primaryGreen + '20'} />
-                )}
-              </View>
-              <View style={styles.locationInfo}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                  <Text style={styles.locationLabel}>
-                    {locating ? 'Locating...' : 'Delivery in 12 mins'}
-                  </Text>
-                  {!locating && <ChevronDown size={14} color={COLORS.darkText} />}
-                </View>
-                <Text style={styles.locationValue} numberOfLines={1}>
-                  {address ? `${address.area || address.city} • Home` : 'Select Location • Home'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* LARGE SEARCH BAR - Desktop/Tablet Layout */}
-            {(isDesktop || isTablet) && showSearch && (
-              <View style={[
-                styles.searchContainer, 
-                styles.searchContainerLarge,
-                isFocused && styles.searchContainerFocused
-              ]}>
-                <Search size={20} color={isFocused ? COLORS.primaryGreen : COLORS.mutedGray} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search for juices, fruits, vegetables..."
-                  placeholderTextColor={COLORS.mutedGray}
-                  value={searchValue}
-                  onChangeText={onSearchChange}
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
-                  autoCorrect={false}
-                />
-                {searchValue.length > 0 && (
-                  <TouchableOpacity onPress={onSearchClear} style={styles.clearBtn}>
-                    <X size={18} color={COLORS.mutedGray} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {/* Right Action Icons */}
-            <View style={styles.actionRow}>
-              <TouchableOpacity 
-                style={styles.iconBtn} 
-                onPress={() => handleIconPress('/profile')}
-              >
-                <User size={24} color={COLORS.darkText} />
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.iconBtn, styles.cartBtn]} 
-                onPress={() => handleIconPress('/(tabs)/cart')}
-              >
-                <ShoppingCart size={24} color={COLORS.white} />
-                {cartCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{cartCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* MOBILE SEARCH BAR - Second Row */}
-          {!isDesktop && !isTablet && showSearch && (
-            <View style={[
-              styles.searchRowMobile,
-              isFocused && styles.searchContainerFocused
-            ]}>
-              <Search size={18} color={isFocused ? COLORS.primaryGreen : COLORS.mutedGray} />
-              <TextInput
-                style={styles.searchInputMobile}
-                placeholder="Search 'fresh mangoes'..."
-                placeholderTextColor={COLORS.mutedGray}
-                value={searchValue}
-                onChangeText={onSearchChange}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                autoCorrect={false}
-              />
-              {searchValue.length > 0 && (
-                <TouchableOpacity onPress={onSearchClear} style={styles.clearBtn}>
-                  <X size={16} color={COLORS.mutedGray} />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
+      {Platform.OS === 'ios' ? (
+        <BlurView intensity={80} tint="light" style={styles.blurContainer}>
+          <HeaderContent {...contentProps} />
+        </BlurView>
+      ) : (
+        <View style={[styles.blurContainer, { backgroundColor: '#FFFFFF' }]}>
+          <HeaderContent {...contentProps} />
         </View>
-      </BlurView>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   outerContainer: {
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'transparent',
     zIndex: 1000,
     width: '100%',
     position: 'absolute',
@@ -191,9 +254,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
     ...Platform.select({
-      web: {
-        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-      } as any,
       default: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
@@ -275,10 +335,6 @@ const styles = StyleSheet.create({
   searchContainerFocused: {
     backgroundColor: '#FFFFFF',
     borderColor: COLORS.primaryGreen,
-    shadowColor: COLORS.primaryGreen,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
     elevation: 4,
   },
   searchInput: {
@@ -287,9 +343,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.darkText,
-    ...Platform.select({
-      web: { outlineStyle: 'none' } as any
-    })
   },
   searchRowMobile: {
     flexDirection: 'row',

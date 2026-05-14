@@ -99,9 +99,10 @@ const AddProductPage = () => {
 
       setImageUrl(data.secure_url);
       toast({ title: "Image Uploaded", description: "Product image updated successfully.", variant: "success" });
-    } catch (err: any) {
-      console.error('Cloudinary upload error:', err);
-      toast({ title: "Upload Failed", description: err.message || "Failed to upload image.", variant: "destructive" });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Cloudinary upload error:', error);
+      toast({ title: "Upload Failed", description: error.message || "Failed to upload image.", variant: "destructive" });
     } finally {
       setIsUploading(false);
     }
@@ -177,11 +178,12 @@ const AddProductPage = () => {
         router.push('/admin/products');
       }, 1500);
 
-    } catch (err: any) {
-      console.error('Error publishing product:', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error publishing product:', error);
       toast({
         title: "Publish Failed",
-        description: err.message || "Something went wrong while saving the product.",
+        description: error.message || "Something went wrong while saving the product.",
         variant: "destructive",
       });
     } finally {

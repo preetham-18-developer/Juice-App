@@ -6,7 +6,7 @@ interface SkeletonProps {
   variant?: 'rect' | 'circle' | 'text';
 }
 
-const Skeleton = ({ className, variant = 'rect' }: SkeletonProps) => {
+export default function Skeleton({ className, variant = 'rect' }: SkeletonProps) {
   return (
     <div
       className={cn(
@@ -16,6 +16,4 @@ const Skeleton = ({ className, variant = 'rect' }: SkeletonProps) => {
       )}
     />
   );
-};
-
-export default Skeleton;
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useState, forwardRef, useImperativeHandle, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import { CheckCircle, AlertCircle, Info, X } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../../theme/tokens';
@@ -13,11 +13,14 @@ export const Toast = forwardRef<ToastHandle>((_, ref) => {
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [type, setType] = useState<'success' | 'error' | 'info'>('success');
-  const translateY = new Animated.Value(-100);
-  const opacity = new Animated.Value(0);
+  const translateY = useRef(new Animated.Value(-100)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const hideTimer = useRef<NodeJS.Timeout | null>(null);
 
   useImperativeHandle(ref, () => ({
     show: (msg, t = 'success', duration = 3000) => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      
       setMessage(msg);
       setType(t);
       setVisible(true);
@@ -36,11 +39,17 @@ export const Toast = forwardRef<ToastHandle>((_, ref) => {
         })
       ]).start();
 
-      setTimeout(() => {
+      hideTimer.current = setTimeout(() => {
         hide();
       }, duration);
     }
   }));
+
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, []);
 
   const hide = () => {
     Animated.parallel([

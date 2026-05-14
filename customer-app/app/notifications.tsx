@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Bell, Info, CheckCircle, AlertCircle } from 'lucide-react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '../src/theme/tokens';
@@ -119,14 +119,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notifTitle: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.darkText,
     marginBottom: 4,
   },
   notifMessage: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 14,
     color: COLORS.mutedGray,
     lineHeight: 20,
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     paddingTop: 100,
   },
   emptyText: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     marginTop: 16,
     fontSize: 16,
     color: COLORS.mutedGray,

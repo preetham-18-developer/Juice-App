@@ -26,7 +26,6 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRealtime } from '@/hooks/useRealtime';
-import { useAppStore } from '@/store/useStore';
 
 interface Product {
   id: string;
@@ -41,21 +40,13 @@ interface Product {
 const ProductsPage = () => {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
   const [displayLimit, setDisplayLimit] = useState(10);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  // REALTIME AUTO-REFRESH
-  useRealtime([
-    { table: 'products', callback: () => fetchProducts(true) }
-  ]);
 
   const isFetching = React.useRef(false);
 
@@ -72,7 +63,7 @@ const ProductsPage = () => {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      setProducts((data as any[]) || []);
+      setProducts((data as Product[]) || []);
     } catch (err) {
       console.error('Error fetching products:', err);
     } finally {
@@ -80,6 +71,17 @@ const ProductsPage = () => {
       isFetching.current = false;
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+    fetchProducts();
+  }, []);
+
+  // REALTIME AUTO-REFRESH
+  useRealtime([
+    { table: 'products', callback: () => fetchProducts(true) }
+  ]);
 
   const handleDeleteProduct = async (id: string) => {
     if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) return;
@@ -99,11 +101,12 @@ const ProductsPage = () => {
         description: "The product has been successfully removed from the catalog.",
         variant: "success",
       });
-    } catch (err: any) {
-      console.error('Error deleting product:', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error deleting product:', error);
       toast({
         title: "Delete Failed",
-        description: err.message || "Failed to delete product. Please try again.",
+        description: error.message || "Failed to delete product. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -240,7 +243,7 @@ const ProductsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {loading ? (
+              {loading && products.length === 0 ? (
                 [1, 2, 3].map(i => (
                   <tr key={i} className="animate-pulse">
                     <td colSpan={6} className="px-6 py-8">
@@ -281,8 +284,9 @@ const ProductsPage = () => {
                               description: `${product.name} is now ₹${newPrice}`,
                               variant: "success",
                             });
-                          } catch (err: any) {
-                            toast({ title: "Update Failed", description: err.message, variant: "destructive" });
+                          } catch (err: unknown) {
+                            const error = err as Error;
+                            toast({ title: "Update Failed", description: error.message, variant: "destructive" });
                             e.target.value = product.price_per_kg.toString();
                           }
                         }}
@@ -328,7 +332,7 @@ const ProductsPage = () => {
 
       {/* Mobile View (Cards) */}
       <div className="lg:hidden">
-        {loading ? (
+        {loading && products.length === 0 ? (
           [1, 2, 3].map(i => <div key={i} className="h-40 bg-slate-100 rounded-3xl mb-4 animate-pulse" />)
         ) : displayedProducts.map(product => (
           <ProductCardMobile key={product.id} product={product} />

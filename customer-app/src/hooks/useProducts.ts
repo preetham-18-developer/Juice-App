@@ -62,9 +62,10 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
           ProductService.prefetchImages(data);
         }
       });
-    } catch (err: any) {
-      monitor.log('ERROR', 'useProducts', 'Fetch failed', { err });
-      setError(err.message || 'Failed to load products');
+    } catch (err: unknown) {
+      const error = err as Error;
+      monitor.log('ERROR', 'useProducts', 'Fetch failed', { error });
+      setError(error.message || 'Failed to load products');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -76,8 +77,17 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
 
     const channelId = `products-${Math.random().toString(36).slice(2, 9)}`;
     const channel = supabase.channel(channelId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        fetchProducts(true);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+        if (payload.eventType === 'UPDATE') {
+          setProducts(current => current.map(p => p.id === payload.new.id ? { ...p, ...payload.new } : p));
+        } else if (payload.eventType === 'INSERT') {
+          // Only add if it matches current category to avoid mixing
+          if (!category || (payload.new.category && payload.new.category.toLowerCase().includes(category.toLowerCase()))) {
+            setProducts(current => [payload.new as Product, ...current]);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setProducts(current => current.filter(p => p.id !== payload.old.id));
+        }
       })
       .subscribe();
 

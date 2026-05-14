@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { 
   COLORS as NEW_COLORS, 
   SPACING as NEW_SPACING, 
@@ -17,7 +18,7 @@ export const COLORS = {
 export const TYPOGRAPHY = {
   ...NEW_TYPOGRAPHY,
   subtext: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_400Regular',
     fontSize: 14,
     color: '#6B7280',
   }

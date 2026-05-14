@@ -160,7 +160,7 @@ export default function CartScreen() {
           longitude: selectedAddress?.longitude || 0,
           items: items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
           total: getGrandTotal(),
-          paymentType: 'cod',
+          paymentType: 'cod' as const,
           createdAt: new Date().toISOString(),
         };
         

@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   categoryText: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 12,
   },
@@ -347,20 +347,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   ratingText: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 14,
     color: '#92400e',
     marginLeft: 6,
   },
   name: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 32,
     color: '#1e293b',
   },
   description: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 15,
     color: '#64748b',
     marginTop: 12,
@@ -388,13 +388,13 @@ const styles = StyleSheet.create({
     borderColor: '#f1f5f9',
   },
   statValue: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 16,
     color: '#1e293b',
   },
   statLabel: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 12,
     color: '#94a3b8',
   },
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 18,
     color: '#1e293b',
@@ -436,20 +436,20 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   variantName: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 15,
     color: '#64748b',
   },
   variantPrice: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 22,
     color: '#1e293b',
     marginVertical: 4,
   },
   variantSize: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 12,
     color: '#94a3b8',
   },
@@ -483,20 +483,20 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   weightText: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 28,
     color: '#1e293b',
   },
   weightUnit: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 16,
     color: '#64748b',
     marginLeft: 4,
   },
   priceHint: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 14,
     color: '#94a3b8',
     marginTop: 14,
@@ -525,12 +525,12 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   totalLabel: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontSize: 13,
     color: '#94a3b8',
   },
   totalPrice: {
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 26,
     color: '#1e293b',
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   },
   cartButtonText: {
     color: '#FFFFFF',
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
     fontSize: 17,
   },
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   outOfStockTextSmall: {
     color: '#ef4444',
     fontSize: 10,
-    fontFamily: 'Calibri',
+    fontFamily: 'Outfit_700Bold',
     fontWeight: '700',
   },
 });

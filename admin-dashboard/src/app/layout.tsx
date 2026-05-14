@@ -40,18 +40,18 @@ export default function RootLayout({
           [style*="position: fixed"][style*="bottom: 0"],
           [style*="position: fixed"][style*="right: 0"],
           [style*="position: fixed"][style*="z-index: 1"] {
-            display: none !important !important;
-            visibility: hidden !important !important;
-            opacity: 0 !important !important;
-            pointer-events: none !important !important;
-            position: fixed !important !important;
-            top: -9999px !important !important;
-            left: -9999px !important !important;
-            z-index: -9999 !important !important;
-            height: 0 !important !important;
-            width: 0 !important !important;
-            margin: 0 !important !important;
-            padding: 0 !important !important;
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            position: fixed !important;
+            top: -9999px !important;
+            left: -9999px !important;
+            z-index: -9999 !important;
+            height: 0 !important;
+            width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
         `}} />
       </head>

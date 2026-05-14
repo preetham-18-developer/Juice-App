@@ -12,6 +12,7 @@ import { Order } from '../../src/types';
 import { ShoppingBag, ChevronRight, Clock } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/store/ThemeContext';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 export default function OrdersScreen() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function OrdersScreen() {
     fetchOrders();
 
     // ── Realtime subscription ───────────────────────────────────────────
-    let channel: any;
+    let channel: RealtimeChannel;
     
     async function setupSubscription() {
       const { data: { user } } = await supabase.auth.getUser();
