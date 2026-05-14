@@ -78,32 +78,48 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
+      console.log("[Auth] Signup Step 1: Request started");
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
-        password,
+        password: password.trim(),
         options: {
-          data: { full_name: name.trim(), phone: phone.trim() }
+          data: { 
+            full_name: name.trim(), 
+            phone: phone.trim(),
+            role: 'user'
+          }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("[Auth] Signup Step 2: Error received:", error);
+        throw error;
+      }
 
       if (data?.user) {
+        console.log("[Auth] Signup Step 3: Success. User created.");
         setSignupDone(true);
       }
     } catch (err: any) {
       const technicalError = err.message || 'Signup failed';
+      const status = err.status || 0;
       let userMessage = 'Unable to complete signup right now.';
       
-      if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch') || technicalError.includes('AbortError')) {
-        userMessage = 'Unable to connect right now. Please check your internet connection and try again.';
+      if (status === 429) {
+        userMessage = 'Too many requests. Please wait.';
+      } else if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch') || technicalError.includes('TIMEOUT')) {
+        userMessage = 'Connection lost. Please check your internet.';
       } else {
         userMessage = technicalError;
       }
 
       toastRef.current?.show(userMessage, 'error');
       if (Platform.OS !== 'web') {
-        Alert.alert('Connection Issue', userMessage, [{ text: 'Retry', onPress: () => handleSignup() }, { text: 'OK' }]);
+        Alert.alert(
+          'Signup Analysis', 
+          `Status: ${status}\nResult: ${userMessage}\n\nTrace: ${technicalError}`,
+          [{ text: 'Retry', onPress: () => handleSignup() }, { text: 'OK' }]
+        );
       }
     } finally {
       setLoading(false);

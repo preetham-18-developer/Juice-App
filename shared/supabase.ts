@@ -17,34 +17,36 @@ const supabaseAnonKey = 'sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__';
 /**
  * Robust Fetch wrapper with retries and timeouts to handle mobile network instability.
  */
-const robustFetch = async (url: string | URL | Request, options?: RequestInit, retries = 3, timeout = 15000): Promise<Response> => {
+const robustFetch = async (url: string | URL | Request, options?: RequestInit, retries = 3, timeout = 20000): Promise<Response> => {
   for (let i = 0; i < retries; i++) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    
     try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), timeout);
       });
-      clearTimeout(id);
-      return response;
+
+      // Race the fetch against the timeout
+      const response = await Promise.race([
+        fetch(url, options),
+        timeoutPromise
+      ]);
+
+      return response as Response;
     } catch (err: any) {
-      clearTimeout(id);
-      const isRetryable = err.name === 'AbortError' || 
+      const isRetryable = err.message === 'TIMEOUT' || 
                          err.message?.toLowerCase().includes('network') || 
                          err.message?.toLowerCase().includes('fetch');
       
       if (isRetryable && i < retries - 1) {
         console.warn(`[Network] Retry attempt ${i + 1} for:`, url);
-        // Exponential backoff
+        // Wait before retrying (exponential backoff)
         await new Promise(res => setTimeout(res, 1000 * Math.pow(2, i)));
         continue;
       }
       throw err;
     }
   }
-  throw new Error('Network request failed after retries');
+  throw new Error('Network request failed after multiple retries');
 };
 
 // Detect platform correctly for both Web and Native

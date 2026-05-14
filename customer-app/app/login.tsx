@@ -131,32 +131,34 @@ export default function LoginScreen() {
 
     const performSignIn = async (attempt: number): Promise<void> => {
       try {
-        console.log('[Auth] Attempting sign-in for:', email.trim().toLowerCase());
+        console.log(`[Auth] Step 1: Initiating sign-in attempt ${attempt + 1}`);
+        
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
-          password: password.trim(), // Added trim to password to avoid hidden mobile keyboard spaces
+          password: password.trim(),
         });
 
         if (error) {
-          // Explicitly handle all auth errors to prevent silent failures
-          console.error("[Auth] Login error details:", error);
+          console.error("[Auth] Step 2: Server responded with error:", error);
           
           let userMessage = 'Invalid email or password.';
           const technicalError = error.message || 'Unknown error';
+          const status = (error as any).status || 0;
 
-          if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch') || technicalError.includes('AbortError')) {
-            userMessage = 'Unable to connect right now. Please check your internet connection and try again.';
-          } else if (technicalError.includes('Email not confirmed')) {
-            userMessage = 'Please verify your email address before signing in.';
-          } else if (technicalError.includes('Rate limit')) {
-            userMessage = 'Too many attempts. Please wait a moment.';
+          // DIFFERENTIATE ERRORS
+          if (status === 400) {
+             userMessage = 'Incorrect email or password. Please try again.';
+          } else if (status === 429) {
+             userMessage = 'Too many attempts. Please wait a few minutes.';
+          } else if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch') || technicalError.includes('TIMEOUT')) {
+            userMessage = 'Unable to connect to the server. Please check your data/WiFi.';
           }
           
           toastRef.current?.show(userMessage, 'error');
           if (Platform.OS !== 'web') {
             Alert.alert(
-              'Connection Issue', 
-              userMessage,
+              'Login Analysis', 
+              `Status: ${status}\nResult: ${userMessage}\n\nTrace: ${technicalError}`,
               [{ text: 'Retry', onPress: () => handleLogin() }, { text: 'OK' }]
             );
           }
@@ -165,24 +167,13 @@ export default function LoginScreen() {
         }
 
         if (data?.session) {
+          console.log("[Auth] Step 3: Auth Success. Verifying session storage...");
           setLoginSuccess(true);
         }
-      } catch (err: unknown) {
-        const error = err as Error;
-        console.error("[Auth] performSignIn critical exception:", error);
-        const errorMessage = error.message || 'Connection issue. Please try again.';
-        const isNetworkError = errorMessage.toLowerCase().includes('network') || 
-                              errorMessage.toLowerCase().includes('fetch');
-
-        if (attempt < maxRetries && isNetworkError) {
-          const delay = baseDelay * Math.pow(2, attempt);
-          console.log(`[Auth] Network failure. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return performSignIn(attempt + 1);
-        }
-
+      } catch (err: any) {
+        console.error("[Auth] CRITICAL CRASH:", err);
+        Alert.alert('App Crash', `A critical error occurred: ${err.message}`);
         setLoading(false);
-        toastRef.current?.show(errorMessage, 'error');
       }
     };
 
