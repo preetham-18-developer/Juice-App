@@ -51,6 +51,8 @@ export default function DeliverySettingsPage() {
     is_delivery_enabled: true
   });
 
+  const [isEditingMap, setIsEditingMap] = useState(false);
+
   async function fetchSettings() {
     try {
       const { data, error } = await supabase
@@ -99,6 +101,7 @@ export default function DeliverySettingsPage() {
 
       if (error) throw error;
       toast({ title: "Settings Saved", variant: "success" });
+      setIsEditingMap(false); // Lock it back after saving
     } catch (err: unknown) {
       const error = err as Error;
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -130,10 +133,20 @@ export default function DeliverySettingsPage() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           {/* Map Section */}
           <div className="xl:col-span-2 space-y-6">
+            <div className="flex justify-between items-center bg-white p-4 rounded-3xl shadow-sm">
+              <h3 className="text-lg font-black text-slate-900">Store GPS Location</h3>
+              <button 
+                onClick={() => setIsEditingMap(!isEditingMap)}
+                className={cn("px-4 py-2 rounded-xl text-xs font-black transition-all", isEditingMap ? "bg-red-100 text-red-600" : "bg-primary/10 text-primary hover:bg-primary/20")}
+              >
+                {isEditingMap ? 'LOCK MAP' : 'EDIT LOCATION'}
+              </button>
+            </div>
             <div className="card-premium p-4 h-[500px] relative overflow-hidden bg-slate-50 border-2 border-slate-100 dark:border-slate-800">
               <MapPicker 
                 initialCenter={[settings.shop_latitude, settings.shop_longitude]}
                 radiusKm={settings.max_delivery_radius}
+                isEditable={isEditingMap}
                 onLocationSelect={(lat, lng, address) => {
                   setSettings(prev => ({ 
                     ...prev, 

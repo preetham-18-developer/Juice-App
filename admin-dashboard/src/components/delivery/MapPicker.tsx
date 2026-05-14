@@ -19,13 +19,16 @@ interface MapPickerProps {
   initialCenter: [number, number];
   onLocationSelect: (lat: number, lng: number, address: string) => void;
   radiusKm?: number;
+  isEditable?: boolean;
 }
 
 // Internal component to handle map clicks/drags
-const MapEvents = ({ onLocationSelect }: { onLocationSelect: (lat: number, lng: number) => void }) => {
+const MapEvents = ({ onLocationSelect, isEditable }: { onLocationSelect: (lat: number, lng: number) => void, isEditable: boolean }) => {
   useMapEvents({
     click(e) {
-      onLocationSelect(e.latlng.lat, e.latlng.lng);
+      if (isEditable) {
+        onLocationSelect(e.latlng.lat, e.latlng.lng);
+      }
     },
   });
   return null;
@@ -40,7 +43,7 @@ const MapRecenter = ({ center }: { center: [number, number] }) => {
   return null;
 };
 
-export default function MapPicker({ initialCenter, onLocationSelect, radiusKm = 5 }: MapPickerProps) {
+export default function MapPicker({ initialCenter, onLocationSelect, radiusKm = 5, isEditable = true }: MapPickerProps) {
   const [center, setCenter] = useState<[number, number]>(initialCenter);
   const [markerPos, setMarkerPos] = useState<[number, number]>(initialCenter);
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,25 +74,27 @@ export default function MapPicker({ initialCenter, onLocationSelect, radiusKm = 
   return (
     <div className="w-full h-full relative rounded-3xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-inner">
       {/* Search Overlay */}
-      <div className="absolute top-4 left-4 right-4 z-[1000] flex gap-2">
-        <div className="flex-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-2 flex items-center gap-2">
-          <Search size={18} className="ml-2 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Search shop address..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="flex-1 bg-transparent border-none outline-none text-sm font-medium py-1"
-          />
-          <button 
-            onClick={handleSearch}
-            className="px-4 py-1.5 bg-primary text-white rounded-xl text-xs font-black uppercase"
-          >
-            Find
-          </button>
+      {isEditable && (
+        <div className="absolute top-4 left-4 right-4 z-[1000] flex gap-2">
+          <div className="flex-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 p-2 flex items-center gap-2">
+            <Search size={18} className="ml-2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search shop address..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="flex-1 bg-transparent border-none outline-none text-sm font-medium py-1"
+            />
+            <button 
+              onClick={handleSearch}
+              className="px-4 py-1.5 bg-primary text-white rounded-xl text-xs font-black uppercase"
+            >
+              Find
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <MapContainer 
         center={center} 
@@ -102,7 +107,7 @@ export default function MapPicker({ initialCenter, onLocationSelect, radiusKm = 
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <MapEvents onLocationSelect={(lat, lng) => {
+        <MapEvents isEditable={isEditable} onLocationSelect={(lat, lng) => {
           setMarkerPos([lat, lng]);
           onLocationSelect(lat, lng, "");
         }} />
@@ -111,7 +116,7 @@ export default function MapPicker({ initialCenter, onLocationSelect, radiusKm = 
 
         <Marker 
           position={markerPos} 
-          draggable={true}
+          draggable={isEditable}
           eventHandlers={{ dragend: handleMarkerDrag }}
         >
         </Marker>
