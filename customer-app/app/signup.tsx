@@ -92,10 +92,18 @@ export default function SignupScreen() {
         setSignupDone(true);
       }
     } catch (err: any) {
-      const msg = err.message || 'Signup failed';
-      toastRef.current?.show(msg, 'error');
+      const technicalError = err.message || 'Signup failed';
+      let userMessage = 'Unable to complete signup right now.';
+      
+      if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch') || technicalError.includes('AbortError')) {
+        userMessage = 'Unable to connect right now. Please check your internet connection and try again.';
+      } else {
+        userMessage = technicalError;
+      }
+
+      toastRef.current?.show(userMessage, 'error');
       if (Platform.OS !== 'web') {
-        Alert.alert('Signup Issue', msg);
+        Alert.alert('Connection Issue', userMessage, [{ text: 'Retry', onPress: () => handleSignup() }, { text: 'OK' }]);
       }
     } finally {
       setLoading(false);

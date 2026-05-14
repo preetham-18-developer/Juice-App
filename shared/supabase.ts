@@ -14,6 +14,39 @@ const sanitizeUrl = (url: string) => {
 const supabaseUrl = 'https://tzpmsylelpqzjmfvabga.supabase.co';
 const supabaseAnonKey = 'sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__';
 
+/**
+ * Robust Fetch wrapper with retries and timeouts to handle mobile network instability.
+ */
+const robustFetch = async (url: string | URL | Request, options?: RequestInit, retries = 3, timeout = 15000): Promise<Response> => {
+  for (let i = 0; i < retries; i++) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(id);
+      return response;
+    } catch (err: any) {
+      clearTimeout(id);
+      const isRetryable = err.name === 'AbortError' || 
+                         err.message?.toLowerCase().includes('network') || 
+                         err.message?.toLowerCase().includes('fetch');
+      
+      if (isRetryable && i < retries - 1) {
+        console.warn(`[Network] Retry attempt ${i + 1} for:`, url);
+        // Exponential backoff
+        await new Promise(res => setTimeout(res, 1000 * Math.pow(2, i)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Network request failed after retries');
+};
+
 // Detect platform correctly for both Web and Native
 const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
 
@@ -87,6 +120,9 @@ export const getSupabase = (): SupabaseClient => {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,
+      },
+      global: {
+        fetch: robustFetch as any,
       },
     });
   }

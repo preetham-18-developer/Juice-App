@@ -144,19 +144,20 @@ export default function LoginScreen() {
           let userMessage = 'Invalid email or password.';
           const technicalError = error.message || 'Unknown error';
 
-          if (technicalError.includes('Email not confirmed')) {
+          if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch') || technicalError.includes('AbortError')) {
+            userMessage = 'Unable to connect right now. Please check your internet connection and try again.';
+          } else if (technicalError.includes('Email not confirmed')) {
             userMessage = 'Please verify your email address before signing in.';
           } else if (technicalError.includes('Rate limit')) {
             userMessage = 'Too many attempts. Please wait a moment.';
-          } else if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch')) {
-            userMessage = 'Network Connection Failed. Please check your internet connection.';
           }
           
           toastRef.current?.show(userMessage, 'error');
           if (Platform.OS !== 'web') {
             Alert.alert(
-              'Login Issue', 
-              `${userMessage}\n\nTechnical Error: ${technicalError}`
+              'Connection Issue', 
+              userMessage,
+              [{ text: 'Retry', onPress: () => handleLogin() }, { text: 'OK' }]
             );
           }
           setLoading(false);
