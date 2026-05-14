@@ -37,6 +37,7 @@ interface HeaderContentProps {
   handleLocationPress: () => void;
   handleIconPress: (route: string) => void;
   router: any;
+  isDeliverable: boolean;
 }
 
 const HeaderContent = ({
@@ -55,6 +56,7 @@ const HeaderContent = ({
   handleLocationPress,
   handleIconPress,
   router,
+  isDeliverable,
 }: HeaderContentProps) => (
   <View style={[styles.container, isDesktop && styles.containerDesktop]}>
     {/* Main Layout Row */}
@@ -71,26 +73,26 @@ const HeaderContent = ({
 
       {/* Location Selector */}
       <TouchableOpacity 
-        style={styles.locationContainer} 
+        style={[styles.locationContainer, !isDeliverable && !locating && styles.locationUnavailableContainer]} 
         activeOpacity={0.7}
         onPress={handleLocationPress}
         disabled={locating}
       >
-        <View style={styles.locationIconBg}>
+        <View style={[styles.locationIconBg, !isDeliverable && !locating && { backgroundColor: '#FEF2F2' }]}>
           {locating ? (
             <ActivityIndicator size="small" color={COLORS.primaryGreen} />
           ) : (
-            <MapPin size={16} color={COLORS.primaryGreen} fill={COLORS.primaryGreen + '20'} />
+            <MapPin size={16} color={!isDeliverable ? '#EF4444' : COLORS.primaryGreen} fill={!isDeliverable ? '#EF444420' : COLORS.primaryGreen + '20'} />
           )}
         </View>
         <View style={styles.locationInfo}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Text style={styles.locationLabel}>
-              {locating ? 'Locating...' : 'Delivery in 12 mins'}
+            <Text style={[styles.locationLabel, !isDeliverable && !locating && { color: '#EF4444' }]}>
+              {locating ? 'Locating...' : (!isDeliverable ? 'Currently unavailable' : 'Delivery in 12 mins')}
             </Text>
-            {!locating && <ChevronDown size={14} color={COLORS.darkText} />}
+            {!locating && <ChevronDown size={14} color={!isDeliverable ? '#EF4444' : COLORS.darkText} />}
           </View>
-          <Text style={styles.locationValue} numberOfLines={1}>
+          <Text style={[styles.locationValue, !isDeliverable && !locating && { color: '#B91C1C' }]} numberOfLines={1}>
             {address ? `${address.area || address.city} • Home` : 'Select Location • Home'}
           </Text>
         </View>
@@ -101,20 +103,22 @@ const HeaderContent = ({
         <View style={[
           styles.searchContainer, 
           styles.searchContainerLarge,
-          isFocused && styles.searchContainerFocused
+          isFocused && styles.searchContainerFocused,
+          !isDeliverable && { opacity: 0.5, backgroundColor: '#F1F5F9' }
         ]}>
           <Search size={20} color={isFocused ? COLORS.primaryGreen : COLORS.mutedGray} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search for juices, fruits..."
+            placeholder={!isDeliverable ? "Search unavailable" : "Search for juices, fruits..."}
             placeholderTextColor={COLORS.mutedGray}
             value={searchValue}
             onChangeText={onSearchChange}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             autoCorrect={false}
+            editable={isDeliverable}
           />
-          {searchValue.length > 0 && (
+          {searchValue.length > 0 && isDeliverable && (
             <TouchableOpacity onPress={onSearchClear} style={styles.clearBtn}>
               <X size={18} color={COLORS.mutedGray} />
             </TouchableOpacity>
@@ -132,12 +136,12 @@ const HeaderContent = ({
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.iconBtn, styles.cartBtn]} 
+          style={[styles.iconBtn, styles.cartBtn, !isDeliverable && { backgroundColor: '#9ca3af' }]} 
           onPress={() => handleIconPress('/(tabs)/cart')}
         >
           <ShoppingCart size={24} color={COLORS.white} />
           {cartCount > 0 && (
-            <View style={styles.badge}>
+            <View style={[styles.badge, !isDeliverable && { backgroundColor: '#4b5563' }]}>
               <Text style={styles.badgeText}>{cartCount}</Text>
             </View>
           )}
@@ -149,20 +153,22 @@ const HeaderContent = ({
     {!isDesktop && !isTablet && showSearch && (
       <View style={[
         styles.searchRowMobile,
-        isFocused && styles.searchContainerFocused
+        isFocused && styles.searchContainerFocused,
+        !isDeliverable && { opacity: 0.5, backgroundColor: '#F1F5F9' }
       ]}>
         <Search size={18} color={isFocused ? COLORS.primaryGreen : COLORS.mutedGray} />
         <TextInput
           style={styles.searchInputMobile}
-          placeholder="Search 'fresh mangoes'..."
+          placeholder={!isDeliverable ? "Search unavailable" : "Search 'fresh mangoes'..."}
           placeholderTextColor={COLORS.mutedGray}
           value={searchValue}
           onChangeText={onSearchChange}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           autoCorrect={false}
+          editable={isDeliverable}
         />
-        {searchValue.length > 0 && (
+        {searchValue.length > 0 && isDeliverable && (
           <TouchableOpacity onPress={onSearchClear} style={styles.clearBtn}>
             <X size={16} color={COLORS.mutedGray} />
           </TouchableOpacity>
@@ -183,11 +189,17 @@ export const Header: React.FC<HeaderProps> = ({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const items = useCartStore((state) => state.items);
+  const isDeliverable = useCartStore((state) => state.isDeliverable);
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const [isFocused, setIsFocused] = useState(false);
 
   // Location Hook
   const { address, loading: locating, fetchLocation } = useLocation();
+
+  // Auto-fetch location on mount to enforce strict delivery radius checks immediately
+  React.useEffect(() => {
+    fetchLocation();
+  }, [fetchLocation]);
 
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
@@ -222,6 +234,7 @@ export const Header: React.FC<HeaderProps> = ({
     handleLocationPress,
     handleIconPress,
     router,
+    isDeliverable,
   };
 
   return (

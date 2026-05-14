@@ -36,7 +36,8 @@ export default function CartScreen() {
     deliveryFee, 
     updateDeliveryFee, 
     placeOrder, 
-    clearCart 
+    clearCart,
+    isDeliverable 
   } = useCartStore();
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
@@ -85,6 +86,11 @@ export default function CartScreen() {
 
   const handleCheckout = async () => {
     if (loading) return;
+
+    if (!isDeliverable) {
+      toastRef.current?.show("Delivery is unavailable at your current location. Please select a different address.", 'error');
+      return;
+    }
 
     if (!selectedAddress || !selectedAddress.formattedAddress) {
       toastRef.current?.show("Please select or enter a delivery address.", 'error');
@@ -313,14 +319,18 @@ export default function CartScreen() {
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.checkoutBtn, loading && { opacity: 0.7 }]} 
+          style={[styles.checkoutBtn, (loading || !isDeliverable) && { opacity: 0.7, backgroundColor: !isDeliverable ? '#9ca3af' : '#3A8C3F' }]} 
           onPress={handleCheckout}
-          disabled={loading}
+          disabled={loading || !isDeliverable}
         >
           <Text style={styles.checkoutBtnText}>
-            {loading ? 'Processing...' : `Proceed to Pay ${ProductService.formatPrice(getGrandTotal())}`}
+            {!isDeliverable 
+              ? 'Delivery Unavailable' 
+              : loading 
+                ? 'Processing...' 
+                : `Proceed to Pay ${ProductService.formatPrice(getGrandTotal())}`}
           </Text>
-          {!loading && <ChevronRight size={20} color="#FFFFFF" />}
+          {!loading && isDeliverable && <ChevronRight size={20} color="#FFFFFF" />}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

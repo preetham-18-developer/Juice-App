@@ -21,7 +21,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@supabase/supabase-js": "^2.104.1",
-    "@juice-shop/shared": "*",
+    "@juice-shop/shared": "file:../shared",
     "axios": "^1.15.2",
     "balloons-js": "^0.0.3",
     "class-variance-authority": "^0.7.1",

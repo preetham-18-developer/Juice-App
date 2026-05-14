@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'expo-router';
-import { Phone, ArrowRight, User, Mail, ShieldCheck, CheckCircle } from 'lucide-react-native';
+import { Phone, ArrowRight, User, Mail, ShieldCheck, CheckCircle, ChevronLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Toast, ToastHandle } from '../src/components/ui/Toast';
 import { Celebration } from '../src/components/ui/Celebration';
@@ -92,7 +92,11 @@ export default function SignupScreen() {
         setSignupDone(true);
       }
     } catch (err: any) {
-      toastRef.current?.show(err.message || 'Signup failed', 'error');
+      const msg = err.message || 'Signup failed';
+      toastRef.current?.show(msg, 'error');
+      if (Platform.OS !== 'web') {
+        Alert.alert('Signup Issue', msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -182,16 +186,23 @@ export default function SignupScreen() {
         style={styles.container}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <ChevronLeft size={28} color="#0f172a" />
+          </TouchableOpacity>
+
           <View style={styles.header}>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Fresh juices delivered to your door 🍊</Text>
           </View>
 
           <View style={styles.form}>
-            <Field label="Full Name" touched={touched.name} error={touched.name ? errors.name : null} icon={<User size={20} color={touched.name && errors.name ? "#ef4444" : "#94a3b8"} />}>
+            <Field label="Full Name *" touched={touched.name} error={touched.name ? errors.name : null} icon={<User size={20} color={touched.name && errors.name ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. Preetham Goud"
+                placeholder="Enter your name"
                 value={name}
                 onChangeText={(val) => {
                   setName(val);
@@ -205,7 +216,7 @@ export default function SignupScreen() {
               />
             </Field>
 
-            <Field label="Email Address" touched={touched.email} error={touched.email ? errors.email : null} icon={<Mail size={20} color={touched.email && errors.email ? "#ef4444" : "#94a3b8"} />}>
+            <Field label="Email Address *" touched={touched.email} error={touched.email ? errors.email : null} icon={<Mail size={20} color={touched.email && errors.email ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="you@example.com"
@@ -223,7 +234,7 @@ export default function SignupScreen() {
               />
             </Field>
 
-            <Field label="Phone Number" touched={touched.phone} error={touched.phone ? errors.phone : null} icon={<Phone size={20} color={touched.phone && errors.phone ? "#ef4444" : "#94a3b8"} />}>
+            <Field label="Phone Number *" touched={touched.phone} error={touched.phone ? errors.phone : null} icon={<Phone size={20} color={touched.phone && errors.phone ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="9876543210"
@@ -240,7 +251,7 @@ export default function SignupScreen() {
               />
             </Field>
 
-            <Field label="Password" touched={touched.password} error={touched.password ? errors.password : null} icon={<ShieldCheck size={20} color={touched.password && errors.password ? "#ef4444" : "#94a3b8"} />}>
+            <Field label="Password *" touched={touched.password} error={touched.password ? errors.password : null} icon={<ShieldCheck size={20} color={touched.password && errors.password ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="Min. 6 characters"
@@ -257,7 +268,7 @@ export default function SignupScreen() {
               />
             </Field>
 
-            <Field label="Confirm Password" touched={touched.confirmPassword} error={touched.confirmPassword ? errors.confirmPassword : null} icon={<ShieldCheck size={20} color={touched.confirmPassword && errors.confirmPassword ? "#ef4444" : "#94a3b8"} />}>
+            <Field label="Confirm Password *" touched={touched.confirmPassword} error={touched.confirmPassword ? errors.confirmPassword : null} icon={<ShieldCheck size={20} color={touched.confirmPassword && errors.confirmPassword ? "#ef4444" : "#94a3b8"} />}>
               <TextInput
                 style={styles.input}
                 placeholder="Re-enter password"
@@ -348,6 +359,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingBottom: 8,
   },
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 10 : 20,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
   title: {
     fontFamily: 'Outfit_700Bold',
     fontSize: 30,
@@ -367,9 +397,8 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 18 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   label: { 
-    fontFamily: 'Outfit_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 14, 
-    fontWeight: '700', 
     color: '#374151', 
     marginBottom: 8 
   },
@@ -379,7 +408,7 @@ const styles = StyleSheet.create({
   inputSuccess: { borderColor: COLORS.primaryGreen, backgroundColor: '#f0fdf4' },
   errorContainer: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   input: { 
-    fontFamily: 'Outfit_700Bold',
+    fontFamily: 'Outfit_400Regular',
     flex: 1, 
     paddingVertical: 16, 
     marginLeft: 12, 

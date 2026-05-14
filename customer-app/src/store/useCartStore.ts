@@ -22,6 +22,8 @@ export interface CartItem {
 }
 
 interface CartStore {
+  isDeliverable: boolean;
+  outOfRangeMessage: string | null;
   items: CartItem[];
   addItem: (product: Product, variant?: JuiceVariant, quantity?: number) => void;
   removeItem: (id: string) => void;
@@ -42,7 +44,13 @@ export const useCartStore = create<CartStore>()(
     (set, get) => ({
       items: [],
       deliveryFee: 0,
+      isDeliverable: true,
+      outOfRangeMessage: null,
       addItem: (product, variant, quantity = 1) => {
+        if (!get().isDeliverable) {
+          Alert.alert("Unavailable", get().outOfRangeMessage || "Delivery is unavailable at your current location.");
+          return;
+        }
         monitor.log('INFO', 'Cart', `Adding item: ${product.name}`, { productId: product.id });
         const isJuice = product.category === 'juice';
         const variantId = variant?.id;
@@ -116,7 +124,13 @@ export const useCartStore = create<CartStore>()(
           const maxRadius = settings.max_delivery_radius || STORE_CONFIG.DEFAULT_MAX_RADIUS_KM;
 
           // 3. Radius Blocking & Fee Logic
+          if (settings.is_delivery_enabled === false) {
+             set({ isDeliverable: false, outOfRangeMessage: "Store is currently not accepting delivery orders." });
+             throw new Error("Store is currently not accepting delivery orders.");
+          }
+
           if (distance > maxRadius) {
+            set({ isDeliverable: false, outOfRangeMessage: "Delivery unavailable at this location.\nPlease try another nearby location." });
             throw new Error(`Sorry, delivery is unavailable for your location. (Distance: ${distance}km, Max Serviceable: ${maxRadius}km)`);
           }
 
@@ -130,12 +144,12 @@ export const useCartStore = create<CartStore>()(
             fee = settings.delivery_fee || 30; // Zone 2: Paid
           }
 
-          set({ deliveryFee: fee });
+          set({ deliveryFee: fee, isDeliverable: true, outOfRangeMessage: null });
           return fee;
         } catch (err: unknown) {
           const error = err as Error;
           console.warn('[CartStore] Delivery validation failed:', error.message);
-          set({ deliveryFee: 0 });
+          set({ deliveryFee: 0, isDeliverable: false, outOfRangeMessage: error.message });
           throw err;
         }
       },

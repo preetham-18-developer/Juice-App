@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { LocationService, StructuredAddress } from '../services/LocationService';
 import { monitor } from '../services/MonitoringService';
 import { Platform, Linking } from 'react-native';
+import { useCartStore } from '../store/useCartStore';
 
 interface UseLocationResult {
   loading: boolean;
@@ -50,6 +51,10 @@ export function useLocation(): UseLocationResult {
       
       if (structuredAddress) {
         setAddress(structuredAddress);
+        // SYNC WITH CART STORE TO ENFORCE STRICT DELIVERY RADIUS
+        useCartStore.getState().updateDeliveryFee(structuredAddress.latitude, structuredAddress.longitude).catch(e => {
+            console.log('Location out of range:', e.message);
+        });
       } else {
         setError('Could not automatically determine your address. Please enter it manually.');
       }

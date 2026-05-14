@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useRouter, useSegments } from 'expo-router';
-import { Mail, Lock, ArrowRight, Leaf } from 'lucide-react-native';
+import { Mail, Lock, ArrowRight, Leaf, ChevronLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../src/theme/tokens';
 import { Celebration } from '../src/components/ui/Celebration';
@@ -131,9 +131,10 @@ export default function LoginScreen() {
 
     const performSignIn = async (attempt: number): Promise<void> => {
       try {
+        console.log('[Auth] Attempting sign-in for:', email.trim().toLowerCase());
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
-          password,
+          password: password.trim(), // Added trim to password to avoid hidden mobile keyboard spaces
         });
 
         if (error) {
@@ -141,15 +142,23 @@ export default function LoginScreen() {
           console.error("[Auth] Login error details:", error);
           
           let userMessage = 'Invalid email or password.';
-          if (error.message.includes('Email not confirmed')) {
+          const technicalError = error.message || 'Unknown error';
+
+          if (technicalError.includes('Email not confirmed')) {
             userMessage = 'Please verify your email address before signing in.';
-          } else if (error.message.includes('Rate limit')) {
+          } else if (technicalError.includes('Rate limit')) {
             userMessage = 'Too many attempts. Please wait a moment.';
-          } else if (error.message.includes('Database error')) {
-            userMessage = 'Server maintenance in progress. Try again soon.';
+          } else if (technicalError.toLowerCase().includes('network') || technicalError.toLowerCase().includes('fetch')) {
+            userMessage = 'Network Connection Failed. Please check your internet connection.';
           }
           
           toastRef.current?.show(userMessage, 'error');
+          if (Platform.OS !== 'web') {
+            Alert.alert(
+              'Login Issue', 
+              `${userMessage}\n\nTechnical Error: ${technicalError}`
+            );
+          }
           setLoading(false);
           return;
         }
@@ -204,6 +213,13 @@ export default function LoginScreen() {
             </View>
           </View>
 
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <ChevronLeft size={28} color="#064e3b" />
+          </TouchableOpacity>
+
           <View style={styles.header}>
             <View style={styles.logoContainer}>
               <LinearGradient
@@ -223,7 +239,7 @@ export default function LoginScreen() {
           <View style={styles.form}>
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Email Address</Text>
+                <Text style={styles.label}>Email Address *</Text>
                 {emailError && touched.email && (
                   <Animated.View entering={FadeInUp} style={styles.errorContainer}>
                     <Text style={styles.errorTextSmall}>{emailError}</Text>
@@ -262,7 +278,7 @@ export default function LoginScreen() {
 
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Password</Text>
+                <Text style={styles.label}>Password *</Text>
                 {passwordError && touched.password && (
                   <Animated.View entering={FadeInUp} style={styles.errorContainer}>
                     <Text style={styles.errorTextSmall}>{passwordError}</Text>
@@ -444,11 +460,28 @@ const styles = StyleSheet.create({
   leaf1: { position: 'absolute', top: -20, left: -30, opacity: 0.3 },
   leaf2: { position: 'absolute', top: 100, right: -20, opacity: 0.2 },
   header: {
-    paddingTop: 60,
+    paddingTop: 10,
     paddingBottom: 20,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
+  },
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 10 : 20,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   logoContainer: {
     width: 100,
@@ -482,10 +515,9 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 15 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   label: { 
-    fontFamily: 'Outfit_700Bold',
+    fontFamily: 'Outfit_600SemiBold',
     fontSize: 14, 
     color: '#374151', 
-    fontWeight: '700' 
   },
   errorTextSmall: { 
     fontFamily: 'Outfit_700Bold',
@@ -498,7 +530,7 @@ const styles = StyleSheet.create({
   inputSuccess: { borderColor: COLORS.primaryGreen, backgroundColor: '#f0fdf4' },
   errorContainer: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   input: { 
-    fontFamily: 'Outfit_700Bold',
+    fontFamily: 'Outfit_400Regular',
     flex: 1, 
     paddingVertical: 16, 
     marginLeft: 12, 

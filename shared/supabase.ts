@@ -11,57 +11,68 @@ const sanitizeUrl = (url: string) => {
   return url;
 };
 
-const supabaseUrl = sanitizeUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co');
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseUrl = 'https://tzpmsylelpqzjmfvabga.supabase.co';
+const supabaseAnonKey = 'sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__';
 
-// Detect platform without hard-depending on react-native for web compatibility
-const isWeb = typeof window !== 'undefined';
+// Detect platform correctly for both Web and Native
+const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
 
 // Custom storage adapter with web fallback for cross-platform support
 const SharedStorageAdapter = {
   getItem: async (key: string) => {
     if (isWeb) {
-      if (typeof localStorage !== 'undefined') {
-        return localStorage.getItem(key);
-      }
-      return null;
+      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
     }
-    // Native (React Native / Expo)
     try {
-      // In Expo, SecureStore is available via the package
+      // Try SecureStore first
       const SecureStore = require('expo-secure-store');
-      return await SecureStore.getItemAsync(key);
+      const value = await SecureStore.getItemAsync(key);
+      if (value) return value;
+      
+      // Fallback to AsyncStorage
+      const AsyncStorageModule = require('@react-native-async-storage/async-storage');
+      const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
+      return await AsyncStorage.getItem(key);
     } catch (e) {
-      console.warn('[Storage] Native SecureStore error:', e);
-      return null;
+      try {
+        const AsyncStorageModule = require('@react-native-async-storage/async-storage');
+        const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
+        return await AsyncStorage.getItem(key);
+      } catch (inner) {
+        return null;
+      }
     }
   },
   setItem: async (key: string, value: string) => {
     if (isWeb) {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(key, value);
-      }
+      if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
       return;
     }
     try {
       const SecureStore = require('expo-secure-store');
       await SecureStore.setItemAsync(key, value);
     } catch (e) {
-      console.warn('[Storage] Native SecureStore error:', e);
+      try {
+        const AsyncStorageModule = require('@react-native-async-storage/async-storage');
+        const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
+        await AsyncStorage.setItem(key, value);
+      } catch (inner) {}
     }
   },
   removeItem: async (key: string) => {
     if (isWeb) {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(key);
-      }
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
       return;
     }
     try {
       const SecureStore = require('expo-secure-store');
       await SecureStore.deleteItemAsync(key);
     } catch (e) {
-      console.warn('[Storage] Native SecureStore error:', e);
+      try {
+        const AsyncStorageModule = require('@react-native-async-storage/async-storage');
+        const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
+        await AsyncStorage.removeItem(key);
+      } catch (inner) {}
     }
   },
 };

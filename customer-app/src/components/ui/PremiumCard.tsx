@@ -73,6 +73,8 @@ const SafeProductImage = React.memo(({
   );
 });
 
+import { useCartStore } from '../../store/useCartStore';
+
 const PremiumCard: React.FC<PremiumCardProps> = ({
   index,
   title,
@@ -86,6 +88,7 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
   isSearching = false,
 }) => {
   const scale = useSharedValue(1);
+  const isDeliverable = useCartStore((state) => state.isDeliverable);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -101,8 +104,9 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
 
   const handleAddToCart = useCallback((e: any) => {
     e.stopPropagation();
+    if (!isDeliverable) return;
     onAddToCart?.();
-  }, [onAddToCart]);
+  }, [onAddToCart, isDeliverable]);
 
   const delay = Math.min((index % 6) * 60, 300);
 
@@ -110,13 +114,14 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
     // OUTER: handles clean entrance — NO springify for better performance
     <Animated.View 
       entering={isSearching ? undefined : FadeIn.duration(300).delay(Math.min(delay, 200))}
+      style={!isDeliverable ? { opacity: 0.5 } : {}}
     >
       {/* INNER: handles subtle scale press transform */}
       <Animated.View style={[styles.container, animatedStyle]}>
         <Pressable
-          onPress={onPress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
+          onPress={isDeliverable ? onPress : undefined}
+          onPressIn={isDeliverable ? handlePressIn : undefined}
+          onPressOut={isDeliverable ? handlePressOut : undefined}
           style={styles.card}
           accessibilityRole="button"
           accessibilityLabel={`${title}, ₹${Math.round(price)}`}
@@ -142,9 +147,14 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
             </View>
 
             {/* Sold out overlay */}
-            {!isAvailable && (
+            {!isAvailable && isDeliverable && (
               <View style={styles.soldOutOverlay}>
                 <Text style={styles.soldOutText}>RESERVED</Text>
+              </View>
+            )}
+            {!isDeliverable && (
+              <View style={styles.soldOutOverlay}>
+                <Text style={styles.soldOutText}>UNAVAILABLE</Text>
               </View>
             )}
           </View>
@@ -156,7 +166,7 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
 
             <View style={styles.footer}>
               <Text style={styles.price}>₹{Math.round(price)}</Text>
-              {onAddToCart && isAvailable && (
+              {onAddToCart && isAvailable && isDeliverable && (
                 <Pressable
                   onPress={handleAddToCart}
                   style={styles.cartBtn}
