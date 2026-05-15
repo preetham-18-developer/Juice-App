@@ -50,10 +50,17 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
 
-  const { products, loading, refreshing, error, hasMore, loadMore, refresh } = useProducts({
+  // INSTRUMENTATION: Render Tracker
+  const renderCount = useRef(0);
+  renderCount.current++;
+  console.log(`[HomeScreen] Render #${renderCount.current} | Category: ${activeCategory} | Search: ${debouncedSearch || 'Empty'}`);
+
+  const productOptions = useMemo(() => ({
     category: activeCategory,
     search: debouncedSearch
-  });
+  }), [activeCategory, debouncedSearch]);
+
+  const { products, loading, refreshing, error, hasMore, loadMore, refresh } = useProducts(productOptions);
   
   const { width: windowWidth } = useWindowDimensions();
   const numColumns = useMemo(() => windowWidth >= 1024 ? 3 : 2, [windowWidth]);

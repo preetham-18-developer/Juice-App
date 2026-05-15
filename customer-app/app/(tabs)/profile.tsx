@@ -207,24 +207,6 @@ export default function ProfileScreen() {
 
       <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Text style={styles.sectionTitle}>App Settings</Text>
-        {isAdmin && (
-          <>
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              onPress={() => router.push('/admin')}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: '#FF770015' }]}>
-                <ShieldCheck size={22} color="#FF7700" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.menuLabel, { color: theme.text }]}>Admin Dashboard</Text>
-                <Text style={styles.menuSubtitle}>Manage orders, products & stats</Text>
-              </View>
-              <ChevronRight size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
-            <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-          </>
-        )}
         {renderSettingRow('Push Notifications', settings.notifications, (v) => setSettings({...settings, notifications: v}))}
         {renderSettingRow('Order Updates', settings.orderUpdates, (v) => setSettings({...settings, orderUpdates: v}))}
         {renderSettingRow('Dark Mode', isDarkMode, toggleDarkMode)}

@@ -19,7 +19,11 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
   const search = options?.search;
 
   const fetchProducts = useCallback(async (isRefresh = false) => {
-    if (fetchingRef.current && !isRefresh) return;
+    // Only block if we are already fetching and it's NOT a refresh
+    if (fetchingRef.current && !isRefresh) {
+      console.log('[useProducts] Fetch blocked: already in progress');
+      return;
+    }
     
     if (isRefresh) {
       pageRef.current = 0;
@@ -33,42 +37,42 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
       else if (pageRef.current === 0) setLoading(true);
       
       setError(null);
+      console.log(`[useProducts] FETCHING DATA | Refresh: ${isRefresh} | Page: ${pageRef.current}`);
 
-      await monitor.trackPerformance('FetchProducts', async () => {
-        const from = pageRef.current * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
+      const from = pageRef.current * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
 
-        let query = supabase
-          .from('products')
-          .select('id, name, description, price, price_per_kg, image_url, category, is_available, rating')
-          .range(from, to)
-          .order('id', { ascending: true });
+      let query = supabase
+        .from('products')
+        .select('id, name, description, price_per_kg, image_url, category, is_available')
+        .range(from, to)
+        .order('id', { ascending: true });
 
-        if (category) {
-          query = query.ilike('category', `%${category}%`);
-        }
+      if (category) {
+        query = query.ilike('category', `%${category}%`);
+      }
 
-        if (search) {
-          query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
-        }
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+      }
 
-        const { data, error: supabaseError } = await safeQuery(query as any);
+      const { data, error: supabaseError } = await safeQuery(query as any);
 
-        if (supabaseError) throw supabaseError;
+      if (supabaseError) throw supabaseError;
 
-        if (data) {
-          const typedData = data as Product[];
-          setProducts(prev => isRefresh ? typedData : [...prev, ...typedData]);
-          setHasMore(typedData.length === PAGE_SIZE);
-          pageRef.current += 1;
-          
-          // Background prefetch for cinematic performance
-          ProductService.prefetchImages(typedData);
-        }
-      });
+      if (data) {
+        const typedData = data as Product[];
+        console.log(`[useProducts] RECEIVED ${typedData.length} items`);
+        setProducts(prev => isRefresh ? typedData : [...prev, ...typedData]);
+        setHasMore(typedData.length === PAGE_SIZE);
+        pageRef.current += 1;
+        
+        // Background prefetch
+        ProductService.prefetchImages(typedData);
+      }
     } catch (err: unknown) {
       const error = err as Error;
-      monitor.log('ERROR', 'useProducts', 'Fetch failed', { error });
+      console.error('[useProducts] Fetch Error:', error.message);
       setError(error.message || 'Failed to load products');
     } finally {
       setLoading(false);
@@ -78,15 +82,16 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
   }, [hasMore, category, search]);
 
   useEffect(() => {
-    fetchProducts(true); // Always refresh when filters change
+    fetchProducts(true);
 
-    const channelId = `products-${Math.random().toString(36).slice(2, 9)}`;
-    const channel = supabase.channel(channelId)
+    const channelName = `products-${Math.random().toString(36).slice(2, 9)}`;
+    console.log(`[useProducts] Setting up Realtime Channel: ${channelName}`);
+    const channel = supabase.channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+        console.log(`[useProducts] Realtime update received: ${payload.eventType}`);
         if (payload.eventType === 'UPDATE') {
           setProducts(current => current.map(p => p.id === payload.new.id ? { ...p, ...payload.new } : p));
         } else if (payload.eventType === 'INSERT') {
-          // Only add if it matches current category to avoid mixing
           if (!category || (payload.new.category && payload.new.category.toLowerCase().includes(category.toLowerCase()))) {
             setProducts(current => [payload.new as Product, ...current]);
           }
@@ -99,7 +104,7 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [category, search]); // Re-run when filters change
+  }, [category, search, fetchProducts]); 
 
   return {
     products,

@@ -115,8 +115,13 @@ export default function LoginScreen() {
           return;
         }
 
-        if (data?.session) {
+        if (data.user) {
           setLoginSuccess(true);
+          // ADDED: Immediate feedback to make it "fast"
+          const role = data.user.email === 'preethamgoud2006@gmail.com' ? 'admin' : 'customer';
+          console.log(`[Login] Success! Directing to ${role} console...`);
+          toastRef.current?.show(`Welcome back! Loading ${role} dashboard...`, 'success');
+          // We trigger the toast via a simple alert or just rely on the Success UI
         }
       } catch (err: any) {
         const duration = Date.now() - startTime;

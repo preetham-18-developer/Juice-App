@@ -64,7 +64,7 @@ export default function RootPage() {
         <h1 className="text-2xl font-black text-slate-900 mb-2">Login Required</h1>
         <p className="text-slate-500 font-medium mb-8">Please login via the Customer App to access the Admin Dashboard.</p>
         <a 
-          href={process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://juicy-app.vercel.app/login"}
+          href={process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://customer-app-juice-u13x.vercel.app/login"}
           className="block w-full py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           Go to Login
