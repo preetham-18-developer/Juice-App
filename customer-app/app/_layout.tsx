@@ -188,21 +188,11 @@ export default function RootLayout() {
         router.replace('/login');
       }
     } else {
-      // If we have a session, wait for role if it's still null to avoid flicker
-      if (userRole === null) return;
-
-      const isAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'store_admin';
-      
-      if (isAdmin) {
-        if (segments[0] !== 'admin') {
-          console.log("[Auth] Admin detected, redirecting to /admin");
-          router.replace('/admin');
-        }
-      } else {
-        if (inAuthGroup || isRoot || segments[0] === 'admin') {
-          console.log("[Auth] Customer detected, redirecting to /(tabs)");
-          router.replace('/(tabs)');
-        }
+      // Everyone lands on the Home Screen (tabs) for a unified brand experience
+      // Admins will have their dashboard access via the Profile Tab
+      if (inAuthGroup || isRoot || segments[0] === 'admin') {
+        console.log("[Auth] Session active, directing to Home Screen");
+        router.replace('/(tabs)');
       }
     }
   }, [session, initialized, segments, fontsLoaded, fontTimeout, userRole]);
