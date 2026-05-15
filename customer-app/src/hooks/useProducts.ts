@@ -13,19 +13,22 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const pageRef = useRef(0);
+  const fetchingRef = useRef(false);
   
   const category = options?.category === 'all' ? undefined : options?.category;
   const search = options?.search;
 
   const fetchProducts = useCallback(async (isRefresh = false) => {
+    if (fetchingRef.current && !isRefresh) return;
+    
     if (isRefresh) {
       pageRef.current = 0;
-      // We don't return early here because we want to allow the refresh
     } else if (!hasMore) {
       return;
     }
 
     try {
+      fetchingRef.current = true;
       if (isRefresh) setRefreshing(true);
       else if (pageRef.current === 0) setLoading(true);
       
@@ -37,7 +40,7 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
 
         let query = supabase
           .from('products')
-          .select('*')
+          .select('id, name, description, price, price_per_kg, image_url, category, is_available, rating')
           .range(from, to)
           .order('id', { ascending: true });
 
@@ -49,17 +52,18 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
           query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
         }
 
-        const { data, error: supabaseError } = await safeQuery(() => query);
+        const { data, error: supabaseError } = await safeQuery(query as any);
 
         if (supabaseError) throw supabaseError;
 
         if (data) {
-          setProducts(prev => isRefresh ? data : [...prev, ...data]);
-          setHasMore(data.length === PAGE_SIZE);
+          const typedData = data as Product[];
+          setProducts(prev => isRefresh ? typedData : [...prev, ...typedData]);
+          setHasMore(typedData.length === PAGE_SIZE);
           pageRef.current += 1;
           
           // Background prefetch for cinematic performance
-          ProductService.prefetchImages(data);
+          ProductService.prefetchImages(typedData);
         }
       });
     } catch (err: unknown) {
@@ -69,6 +73,7 @@ export const useProducts = (options?: { category?: string; search?: string }) =>
     } finally {
       setLoading(false);
       setRefreshing(false);
+      fetchingRef.current = false;
     }
   }, [hasMore, category, search]);
 

@@ -1,3 +1,5 @@
+import { OrderStatus } from '../constants/orderStatus';
+
 export type Category = 'juice' | 'fruit' | 'vegetable' | 'other';
 
 export interface Product {
@@ -26,7 +28,7 @@ export interface Order {
   id: string;
   user_id: string;
   total_amount: number;
-  status: 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'PACKED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'RECEIVED' | 'received' | 'processing' | 'completed' | 'cancelled';
+  status: OrderStatus;
   payment_type: 'online' | 'cod';
   payment_status: string;
   delivery_type: 'delivery' | 'pickup';

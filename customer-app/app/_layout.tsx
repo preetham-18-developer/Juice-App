@@ -93,25 +93,22 @@ export default function RootLayout() {
     // Check initial session safely (local fast read)
     supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(timeout);
-      setSession(session);
-      
-      // OPTIMISTIC BOOT: Assume customer instantly to unblock UI
-      if (session?.user) setUserRole(prev => prev || 'user');
-      setInitialized(true);
-
-      if (session?.user) {
-        // Background sync admin role without blocking UI
+      if (session) {
+        setSession(session);
+        // Instant unlock as customer
+        setUserRole('customer');
+        // Fetch real role in background
         supabase.from('profiles').select('role').eq('id', session.user.id).maybeSingle()
-          .then(({ data, error }) => {
-            if (error) console.warn('Role fetch error:', error);
-            if (data?.role && data.role !== 'user') {
-              setUserRole(data.role);
-            }
-          });
+          .then(({ data }) => {
+            setUserRole(data?.role || 'customer');
+          })
+          .catch(() => setUserRole('customer'))
+          .finally(() => setInitialized(true));
+      } else {
+        setInitialized(true);
       }
-    }).catch(err => {
+    }).catch(() => {
       clearTimeout(timeout);
-      console.error("Supabase Auth Error on boot:", err);
       setInitialized(true);
     });
 
@@ -187,11 +184,16 @@ export default function RootLayout() {
 
     if (!session || !session.user) {
       if (!inAuthGroup) {
-        console.log("[Auth] No session, redirecting to signup");
-        router.replace('/signup');
+        console.log("[Auth] No session, redirecting to login");
+        router.replace('/login');
       }
-    } else if (userRole) {
-      if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'store_admin') {
+    } else {
+      // If we have a session, wait for role if it's still null to avoid flicker
+      if (userRole === null) return;
+
+      const isAdmin = userRole === 'admin' || userRole === 'super_admin' || userRole === 'store_admin';
+      
+      if (isAdmin) {
         if (segments[0] !== 'admin') {
           console.log("[Auth] Admin detected, redirecting to /admin");
           router.replace('/admin');

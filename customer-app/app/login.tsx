@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto';
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { 
@@ -53,51 +54,12 @@ export default function LoginScreen() {
     }
   }, [loginSuccess]);
 
-  // Redirect after success animation
+  // Success feedback
   useEffect(() => {
     if (loginSuccess) {
-      const checkRoleAndRedirect = async () => {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const { data, error } = await supabase
-              .from('profiles')
-              .select('role, store_id')
-              .eq('id', user.id)
-              .maybeSingle();
-            
-            const userRole = data?.role || 'customer';
-            const storeId = data?.store_id;
-            
-            if (userRole === 'super_admin' || userRole === 'admin') {
-              if (Platform.OS === 'web') {
-                // Get the current session to pass tokens for SSO
-                const { data: { session } } = await supabase.auth.getSession();
-                
-                // Production Vercel Dashboard URL with SSO tokens
-                const DASHBOARD_URL = `https://admin-dashboard-juice-icmc.vercel.app/admin/dashboard?access_token=${session?.access_token}&refresh_token=${session?.refresh_token}`;
-                window.location.href = DASHBOARD_URL;
-              } else {
-                router.replace('/admin');
-              }
-            } else if (userRole === 'store_admin' && storeId) {
-              router.replace(`/admin?storeId=${storeId}`);
-            } else {
-              router.replace('/(tabs)');
-            }
-          } else {
-            router.replace('/(tabs)');
-          }
-        } catch (err) {
-          console.error("Login redirect error:", err);
-          router.replace('/(tabs)');
-        }
-      };
-      
-      const timer = setTimeout(() => {
-        checkRoleAndRedirect();
-      }, 1500);
-      return () => clearTimeout(timer);
+      // The Root Layout handles the redirect automatically when the session updates.
+      // We just log it here for debugging purposes.
+      console.log('[Login] Success animation triggered, waiting for global redirect...');
     }
   }, [loginSuccess]);
 

@@ -9,24 +9,39 @@ export default function RootPage() {
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "http://localhost:8081";
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        // Use a more robust production-ready fallback URL
+        const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
+                                (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+                                  ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
+                                  : "https://juicy-app.vercel.app"); // Better default fallback
 
-      if (!session) {
-        window.location.href = `${CUSTOMER_APP_URL}/login`;
-        return;
-      }
+        if (!session) {
+          // Instead of hard-redirecting to localhost, we'll try to find a web login
+          window.location.href = `${CUSTOMER_APP_URL}/login`;
+          return;
+        }
 
-      const userEmail = session.user.email;
-      const ADMIN_EMAIL = "preethamgoud2006@gmail.com";
+        // FETCH ROLE FROM DATABASE (Source of Truth)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
 
-      // STRICT LOGIC: ONLY the specific admin email gets to the dashboard
-      if (userEmail === ADMIN_EMAIL) {
-        router.replace('/admin/dashboard');
-      } else {
-        // Everyone else is a customer, period.
-        window.location.href = CUSTOMER_APP_URL;
+        const role = profile?.role || 'user';
+        const isAdmin = role === 'admin' || role === 'super_admin' || role === 'store_admin';
+
+        if (isAdmin) {
+          router.replace('/admin/dashboard');
+        } else {
+          // Not an admin? Send them to the customer experience
+          window.location.href = CUSTOMER_APP_URL;
+        }
+      } catch (err) {
+        console.error("Redirect check failed:", err);
       }
     };
 

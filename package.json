@@ -7,10 +7,10 @@
     "shared"
   ],
   "scripts": {
-    "start": "concurrently \"npm run dev --workspace=admin-dashboard\" \"npm run dev --workspace=razorpay-backend\" \"npm start --workspace=customer-app\"",
-    "prod": "concurrently \"npm run start --workspace=admin-dashboard\" \"npm run start --workspace=razorpay-backend\" \"npm start --workspace=customer-app\"",
-    "build": "npm run build --workspaces",
-    "lint": "npm run lint --workspaces"
+    "start": "concurrently \"npm run dev --workspace=admin-dashboard\" \"npm run dev --workspace=razorpay-backend\" \"cd customer-app && npm start\"",
+    "prod": "concurrently \"npm run start --workspace=admin-dashboard\" \"npm run start --workspace=razorpay-backend\" \"cd customer-app && npm start\"",
+    "build": "npm run build --workspaces && cd customer-app && npm run build:web",
+    "lint": "npm run lint --workspaces && cd customer-app && npm run lint"
   },
   "devDependencies": {
     "ajv": "^8.20.0",

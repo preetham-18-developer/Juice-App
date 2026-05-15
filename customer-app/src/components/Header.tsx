@@ -415,5 +415,10 @@ const styles = StyleSheet.create({
   },
   clearBtn: {
     padding: 4,
+  },
+  locationUnavailableContainer: {
+    opacity: 0.9,
+    backgroundColor: 'rgba(254, 242, 242, 0.5)',
+    borderRadius: 16,
   }
 });

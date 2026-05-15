@@ -4,6 +4,7 @@ const nextConfig = {
   devIndicators: {
     buildActivity: false,
   },
+  transpilePackages: ['@juice-shop/shared'],
   images: {
     remotePatterns: [
       {

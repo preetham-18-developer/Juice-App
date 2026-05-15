@@ -5,8 +5,8 @@ import {
   Text, 
   Pressable, 
   Platform,
-  Image as RNImage,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -30,23 +30,21 @@ interface PremiumCardProps {
   onPress: () => void;
   onAddToCart?: () => void;
   isAvailable?: boolean;
-  variant?: string;
+  isDeliverable?: boolean; // Now passed as prop for optimization
   isSearching?: boolean;
 }
 
 /**
- * Web-safe image renderer.
- * Uses standard <img> on web to avoid expo-image / RN-Web incompatibilities.
- * Uses React Native Image on native.
+ * High-performance image renderer.
+ * Uses hardware acceleration on native, native <img> on web.
  */
 const SafeProductImage = React.memo(({ 
-  name, category, imageUrl, style 
-}: { name: string; category: string; imageUrl: string; style?: any }) => {
+  name, category, imageUrl 
+}: { name: string; category: string; imageUrl: string }) => {
   const [errored, setErrored] = useState(false);
   const source = getProductImageSource(name, category, errored ? undefined : imageUrl);
 
   if (Platform.OS === 'web') {
-    // Use native <img> on web — avoids ALL expo-image / blurhash / require() issues
     const uri = (source && source.uri) ? source.uri : 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=800&q=80';
     return (
       <img
@@ -63,17 +61,17 @@ const SafeProductImage = React.memo(({
     );
   }
 
-  // Native: use RN Image with fallback
   return (
-    <RNImage
+    <ExpoImage
       source={source}
-      style={[StyleSheet.absoluteFill, { resizeMode: 'contain' }]}
+      style={StyleSheet.absoluteFill}
+      contentFit="contain"
+      transition={200} // Smooth cross-fade
+      cachePolicy="memory-disk"
       onError={() => setErrored(true)}
     />
   );
 });
-
-import { useCartStore } from '../../store/useCartStore';
 
 const PremiumCard: React.FC<PremiumCardProps> = ({
   index,
@@ -85,10 +83,10 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
   onPress,
   onAddToCart,
   isAvailable = true,
+  isDeliverable = true,
   isSearching = false,
 }) => {
   const scale = useSharedValue(1);
-  const isDeliverable = useCartStore((state) => state.isDeliverable);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -111,55 +109,41 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
   const delay = Math.min((index % 6) * 60, 300);
 
   return (
-    // OUTER: handles clean entrance — NO springify for better performance
     <Animated.View 
       entering={isSearching ? undefined : FadeIn.duration(300).delay(Math.min(delay, 200))}
       style={!isDeliverable ? { opacity: 0.5 } : {}}
     >
-      {/* INNER: handles subtle scale press transform */}
       <Animated.View style={[styles.container, animatedStyle]}>
         <Pressable
           onPress={isDeliverable ? onPress : undefined}
           onPressIn={isDeliverable ? handlePressIn : undefined}
           onPressOut={isDeliverable ? handlePressOut : undefined}
           style={styles.card}
-          accessibilityRole="button"
-          accessibilityLabel={`${title}, ₹${Math.round(price)}`}
         >
-          {/* Image Section */}
           <View style={styles.imageSection}>
             <SafeProductImage
               name={title}
               category={category || 'juice'}
               imageUrl={imageUrl}
-              style={styles.image}
             />
 
-            {/* Badges */}
             <View style={styles.badgeRow}>
               <View style={styles.ratingBadge}>
                 <Star size={10} color={COLORS.primaryOrange} fill={COLORS.primaryOrange} />
                 <Text style={styles.ratingText}>{rating}</Text>
               </View>
-              <Pressable style={styles.heartBtn} accessibilityLabel="Add to wishlist">
+              <Pressable style={styles.heartBtn}>
                 <Heart size={14} color={COLORS.mutedGray} />
               </Pressable>
             </View>
 
-            {/* Sold out overlay */}
-            {!isAvailable && isDeliverable && (
+            {(!isAvailable || !isDeliverable) && (
               <View style={styles.soldOutOverlay}>
-                <Text style={styles.soldOutText}>RESERVED</Text>
-              </View>
-            )}
-            {!isDeliverable && (
-              <View style={styles.soldOutOverlay}>
-                <Text style={styles.soldOutText}>UNAVAILABLE</Text>
+                <Text style={styles.soldOutText}>{!isDeliverable ? 'UNAVAILABLE' : 'RESERVED'}</Text>
               </View>
             )}
           </View>
 
-          {/* Text Content */}
           <View style={styles.content}>
             <Text style={styles.category}>{(category || 'COLLECTION').toUpperCase()}</Text>
             <Text style={styles.title} numberOfLines={1}>{title}</Text>
@@ -170,7 +154,6 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
                 <Pressable
                   onPress={handleAddToCart}
                   style={styles.cartBtn}
-                  accessibilityLabel={`Add ${title} to cart`}
                 >
                   <ShoppingBag size={16} color={COLORS.white} />
                 </Pressable>
@@ -184,9 +167,7 @@ const PremiumCard: React.FC<PremiumCardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 6,
-  },
+  container: { padding: 6 },
   card: {
     backgroundColor: COLORS.cream,
     borderRadius: 28,
@@ -195,9 +176,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     minHeight: 260,
     ...Platform.select({
-      web: {
-        boxShadow: '0 6px 20px -8px rgba(0,0,0,0.08)',
-      } as any,
+      web: { boxShadow: '0 6px 20px -8px rgba(0,0,0,0.08)' } as any,
       default: {
         elevation: 4,
         shadowColor: COLORS.luxuryDark,
@@ -215,10 +194,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
   },
   badgeRow: {
     position: 'absolute',
@@ -266,10 +241,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 2,
   },
-  content: {
-    padding: 16,
-    paddingTop: 10,
-  },
+  content: { padding: 16, paddingTop: 10 },
   category: {
     ...TYPOGRAPHY.label,
     fontSize: 9,
@@ -286,10 +258,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  price: {
-    ...TYPOGRAPHY.price,
-    fontSize: 18,
-  },
+  price: { ...TYPOGRAPHY.price, fontSize: 18 },
   cartBtn: {
     width: 36,
     height: 36,
@@ -300,4 +269,14 @@ const styles = StyleSheet.create({
   },
 });
 
-export default React.memo(PremiumCard);
+// ULTRA-STRICT MEMOIZATION: Only re-render if the core data changes
+export default React.memo(PremiumCard, (prev, next) => {
+  return (
+    prev.id === next.id &&
+    prev.price === next.price &&
+    prev.isAvailable === next.isAvailable &&
+    prev.isDeliverable === next.isDeliverable &&
+    prev.isSearching === next.isSearching &&
+    prev.imageUrl === next.imageUrl
+  );
+});

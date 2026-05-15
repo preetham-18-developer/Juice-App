@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { monitor } from '../services/MonitoringService';
-import { Product, JuiceVariant } from '../types';
+import { Product, JuiceVariant, Category } from '../types';
 import { ProductService } from '../services/ProductService';
 import { supabase } from '../../lib/supabase';
 import { Alert, Platform } from 'react-native';
@@ -12,7 +12,7 @@ export interface CartItem {
   id: string;
   productId: string;
   name: string;
-  category: 'juice' | 'fruit';
+  category: Category;
   variantId?: string;
   variantName?: string;
   quantity: number;

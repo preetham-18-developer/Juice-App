@@ -46,6 +46,8 @@ const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.Res
 const Cell = dynamic(() => import('recharts').then(mod => mod.Cell), { ssr: false });
 const PieChart = dynamic(() => import('recharts').then(mod => mod.PieChart), { ssr: false });
 const Pie = dynamic(() => import('recharts').then(mod => mod.Pie), { ssr: false });
+const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false });
+const Bar = dynamic(() => import('recharts').then(mod => mod.Bar), { ssr: false });
 
 const COLORS = ['#84cc16', '#f97316', '#3b82f6', '#8b5cf6'];
 
@@ -204,10 +206,19 @@ const DashboardPage = () => {
     fetchDashboardData();
   }, [currentStore, setCurrentStore, fetchDashboardData]);
 
-  // REALTIME AUTO-REFRESH
+  // REALTIME AUTO-REFRESH - Throttled to 5s to prevent dashboard jitter
+  const lastRefresh = React.useRef(0);
+  const throttledRefresh = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefresh.current > 5000) {
+      fetchDashboardData(true);
+      lastRefresh.current = now;
+    }
+  }, [fetchDashboardData]);
+
   useRealtime([
-    { table: 'orders', callback: () => fetchDashboardData(true) },
-    { table: 'products', callback: () => fetchDashboardData(true) }
+    { table: 'orders', callback: throttledRefresh },
+    { table: 'products', callback: throttledRefresh }
   ]);
 
   if (!mounted) return null;

@@ -1,6 +1,10 @@
-import 'react-native-url-polyfill/auto';
-import { supabase } from '@juice-shop/shared';
-export { supabase, safeQuery, getUserRole, getSupabase } from '@juice-shop/shared';
+/**
+ * Unified Supabase Client Proxy
+ * All core logic is maintained in the shared library for monorepo consistency.
+ */
+export { supabase, safeQuery, getUserRole, getSupabase } from '../../shared/supabase';
+
+import { supabase } from '../../shared/supabase';
 
 /**
  * Health check to verify connection to Supabase

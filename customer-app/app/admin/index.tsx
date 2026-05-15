@@ -8,7 +8,7 @@ import { COLORS } from '../../src/theme/tokens';
 import { supabase } from '../../lib/supabase';
 import { useLocalSearchParams } from 'expo-router';
 
-const BASE_DASHBOARD_URL = 'https://admin-dashboard-juice-icmc.vercel.app';
+const BASE_DASHBOARD_URL = 'https://admin-dashboard-juice.vercel.app';
 const FALLBACK_DASHBOARD_URL = `${BASE_DASHBOARD_URL}/admin/dashboard`;
 
 export default function AdminBridge() {

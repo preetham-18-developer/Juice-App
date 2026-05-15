@@ -13,8 +13,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://tzpmsylelpqzjmfvabga.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://juozeonesytttmaizdso.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable__Xiil3pRsK_lcEnv8dEulQ_Saz4tJSU",
         "EXPO_PUBLIC_API_URL": "https://juice-app-9uzq.onrender.com/api/payment",
         "EXPO_PUBLIC_RAZORPAY_KEY": "rzp_test_Sn7EB9DtuuYSVJ"
       }
@@ -22,8 +22,8 @@
     "production": {
       "distribution": "store",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://tzpmsylelpqzjmfvabga.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://juozeonesytttmaizdso.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable__Xiil3pRsK_lcEnv8dEulQ_Saz4tJSU",
         "EXPO_PUBLIC_API_URL": "https://juice-app-9uzq.onrender.com/api/payment",
         "EXPO_PUBLIC_RAZORPAY_KEY": "rzp_test_Sn7EB9DtuuYSVJ"
       }

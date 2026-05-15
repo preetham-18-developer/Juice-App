@@ -67,50 +67,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         const { data: { session } } = await supabase.auth.getSession();
         
+        const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
+                               (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') 
+                                 ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
+                                 : "https://juicy-app.vercel.app");
+
         if (!session) {
-          const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
-                                 (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') 
-                                   ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
-                                   : "http://localhost:8081");
           window.location.href = `${CUSTOMER_APP_URL}/login`;
           return;
         }
 
-        const userEmail = session.user.email;
-        const ADMIN_EMAIL = "preethamgoud2006@gmail.com";
-
-        // STRICT EMAIL-BASED BLOCKING
-        const isAuthorizedAdmin = userEmail === ADMIN_EMAIL;
-
-        if (!isAuthorizedAdmin) {
-          console.error('Unauthorized admin dashboard access attempt by:', userEmail);
-          
-          // Optional: Force logout if they aren't the admin to clear session
-          // await supabase.auth.signOut();
-          
-          if (typeof window !== 'undefined') {
-            localStorage.clear();
-          }
-          const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
-                                 (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
-                                   ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
-                                   : "http://localhost:8081");
-          window.location.href = `${CUSTOMER_APP_URL}/login?error=unauthorized`;
-          return;
-        }
-
-        // If they ARE the admin, fetch profile to get their name
+        // FETCH ROLE FROM DATABASE (Source of Truth)
         const { data: profile } = await supabase
           .from('profiles')
           .select('id, full_name, role')
           .eq('id', session.user.id)
           .single();
 
+        const role = profile?.role || 'user';
+        const isAdmin = role === 'admin' || role === 'super_admin' || role === 'store_admin';
+
+        if (!isAdmin) {
+          console.error('Unauthorized admin dashboard access attempt by:', session.user.email);
+          
+          if (typeof window !== 'undefined') {
+            localStorage.clear();
+          }
+          window.location.href = `${CUSTOMER_APP_URL}/login?error=unauthorized`;
+          return;
+        }
+
         // Update store with fresh data
         setUser({
           id: session.user.id,
           name: profile?.full_name || 'Admin User',
-          role: isAuthorizedAdmin ? 'super_admin' : (profile?.role || 'admin'),
+          role: role,
           email: session.user.email
         });
 

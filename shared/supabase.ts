@@ -1,5 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-// Version: 2026.05.13.01 - Force Vercel Refresh
+import 'react-native-url-polyfill/auto';
+import { createClient } from '@supabase/supabase-js';
 
 const sanitizeUrl = (url: string) => {
   if (!url || url.includes('placeholder')) return url;
@@ -11,54 +11,44 @@ const sanitizeUrl = (url: string) => {
   return url;
 };
 
-const supabaseUrl = 'https://juozeonesytttmaizdso.supabase.co';
-const supabaseAnonKey = 'sb_publishable_adCATmrAc4vHCLNeR1jvIQ_uA6i6v__';
+const supabaseUrl = 'https://tzpmsylelpqzjmfvabga.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6cG1zeWxlbHBxemptZnZhYmdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzQwMTcsImV4cCI6MjA5MjYxMDAxN30.a8pHx5OubH0ODbWHImt0Ejp2Hj3kAtlI5i14YnkKUXk';
 
 /**
  * Robust Fetch wrapper with retries and timeouts to handle mobile network instability.
  */
-const robustFetch = async (url: string | URL | Request, options?: RequestInit, retries = 3, timeout = 20000): Promise<Response> => {
+const robustFetch = async (url: string | URL | Request, options?: RequestInit, retries = 2, timeout = 5000): Promise<Response> => {
   for (let i = 0; i < retries; i++) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    
     try {
-      // Create a timeout promise
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT')), timeout);
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
       });
-
-      // Race the fetch against the timeout
-      const response = await Promise.race([
-        fetch(url, options),
-        timeoutPromise
-      ]);
-
-      return response as Response;
+      clearTimeout(id);
+      return response;
     } catch (err: any) {
-      const isRetryable = err.message === 'TIMEOUT' || 
-                         err.message?.toLowerCase().includes('network') || 
-                         err.message?.toLowerCase().includes('fetch');
-      
-      if (isRetryable && i < retries - 1) {
-        console.warn(`[Network] Retry attempt ${i + 1} for:`, url);
-        // Wait before retrying (exponential backoff)
-        await new Promise(res => setTimeout(res, 1000 * Math.pow(2, i)));
+      clearTimeout(id);
+      if (i < retries - 1) {
+        // Wait before retrying
+        await new Promise(res => setTimeout(res, 500 * (i + 1)));
         continue;
       }
       throw err;
     }
   }
-  throw new Error('Network request failed after multiple retries');
+  throw new Error('NETWORK_TIMEOUT');
 };
 
-// Detect platform correctly for both Web and Native
-const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
-
-// Custom storage adapter - Simplified to AsyncStorage for maximum compatibility
+// Custom storage adapter - Intelligent Platform Switching
 const SharedStorageAdapter = {
   getItem: async (key: string) => {
-    if (isWeb) {
-      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
-    }
     try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
       const AsyncStorageModule = require('@react-native-async-storage/async-storage');
       const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
       return await AsyncStorage.getItem(key);
@@ -67,22 +57,22 @@ const SharedStorageAdapter = {
     }
   },
   setItem: async (key: string, value: string) => {
-    if (isWeb) {
-      if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
-      return;
-    }
     try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+        return;
+      }
       const AsyncStorageModule = require('@react-native-async-storage/async-storage');
       const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
       await AsyncStorage.setItem(key, value);
     } catch (e) {}
   },
   removeItem: async (key: string) => {
-    if (isWeb) {
-      if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
-      return;
-    }
     try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+        return;
+      }
       const AsyncStorageModule = require('@react-native-async-storage/async-storage');
       const AsyncStorage = AsyncStorageModule.default || AsyncStorageModule;
       await AsyncStorage.removeItem(key);
@@ -90,63 +80,46 @@ const SharedStorageAdapter = {
   },
 };
 
-let supabaseInstance: SupabaseClient | null = null;
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: SharedStorageAdapter as any,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+  global: {
+    fetch: robustFetch,
+  },
+});
 
-export const getSupabase = (): SupabaseClient => {
-  if (!supabaseInstance) {
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        storage: SharedStorageAdapter as any,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
-      },
-      global: {
-        fetch: robustFetch as any,
-      },
-    });
+export const safeQuery = async <T>(queryPromise: Promise<{ data: T | null; error: any }>) => {
+  try {
+    const { data, error } = await queryPromise;
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error: any) {
+    console.error('Database Query Error:', error);
+    return { data: null, error };
   }
-  return supabaseInstance;
 };
 
-export const supabase = getSupabase();
+export const getSupabase = () => supabase;
 
 /**
- * Unified safe query helper with retries and exponential backoff.
+ * Optimized role fetcher with fallback
  */
-export const safeQuery = async <T = unknown>(
-  queryFn: () => PromiseLike<{ data: T | null; error: unknown }>,
-  retries = 3,
-  delay = 500
-): Promise<{ data: T | null; error: unknown }> => {
-  let lastError;
-  const client = getSupabase();
-  
-  for (let i = 0; i < retries; i++) {
-    try {
-      const result = await queryFn();
-      if (result.error) throw result.error;
-      return result;
-    } catch (err: unknown) {
-      lastError = err;
-      const error = err as Error;
-      const isNetworkError = error.message?.toLowerCase().includes('network') || 
-                            error.message?.toLowerCase().includes('fetch');
-      
-      if (!isNetworkError || i === retries - 1) break;
-      
-      const backoff = delay * Math.pow(2, i);
-      await new Promise(resolve => setTimeout(resolve, backoff));
-    }
-  }
-  return { data: null, error: lastError };
-};
-
 export const getUserRole = async (userId: string): Promise<string> => {
-  const { data: profile } = await getSupabase()
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single();
-  return profile?.role || 'customer';
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+    
+    if (error) throw error;
+    return data?.role || 'customer';
+  } catch (err) {
+    console.error('Role Fetch Error:', err);
+    return 'customer';
+  }
 };

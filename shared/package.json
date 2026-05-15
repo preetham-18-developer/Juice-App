@@ -2,6 +2,7 @@
   "name": "@juice-shop/shared",
   "version": "1.0.0",
   "main": "index.ts",
+  "types": "index.ts",
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "expo-secure-store": "~14.0.1",
