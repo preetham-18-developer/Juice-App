@@ -19,15 +19,42 @@ export default function AdminWebView() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [adminUrlWithToken, setAdminUrlWithToken] = useState<string | null>(null);
   
   // The "Early Morning" Premium Dashboard URL
-  // We use the definitive URL provided by the user
-  const ADMIN_URL = 'https://admin-dashboard-juice-u13x.vercel.app/admin/dashboard';
+  const BASE_ADMIN_URL = 'https://admin-dashboard-juice-u13x.vercel.app';
+
+  useEffect(() => {
+    const prepareAdminUrl = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // Append tokens for seamless handoff
+          const url = `${BASE_ADMIN_URL}?access_token=${session.access_token}&refresh_token=${session.refresh_token}`;
+          setAdminUrlWithToken(url);
+        } else {
+          setAdminUrlWithToken(BASE_ADMIN_URL);
+        }
+      } catch (err) {
+        console.error("Failed to prepare admin URL:", err);
+        setAdminUrlWithToken(BASE_ADMIN_URL);
+      }
+    };
+    prepareAdminUrl();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.replace('/login');
   };
+
+  if (!adminUrlWithToken) {
+    return (
+      <View style={styles.loaderOverlay}>
+        <ActivityIndicator size="large" color={COLORS.primaryGreen} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -51,26 +78,34 @@ export default function AdminWebView() {
       </View>
 
       <View style={styles.webviewContainer}>
-        <WebView 
-          source={{ uri: ADMIN_URL }}
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => setLoading(false)}
-          onError={(e) => {
-            console.error('WebView Error:', e.nativeEvent);
-            setError('Failed to load the Premium Dashboard. Please check your internet connection.');
-            setLoading(false);
-          }}
-          style={styles.webview}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.loaderOverlay}>
-              <ActivityIndicator size="large" color={COLORS.primaryGreen} />
-              <Text style={styles.loaderText}>Syncing Premium Dashboard...</Text>
-            </View>
-          )}
-        />
+        {Platform.OS === 'web' ? (
+          <iframe 
+            src={adminUrlWithToken} 
+            style={{ flex: 1, border: 'none', width: '100%', height: '100%' }} 
+            onLoad={() => setLoading(false)}
+          />
+        ) : (
+          <WebView 
+            source={{ uri: adminUrlWithToken }}
+            onLoadStart={() => setLoading(true)}
+            onLoadEnd={() => setLoading(false)}
+            onError={(e) => {
+              console.error('WebView Error:', e.nativeEvent);
+              setError('Failed to load the Premium Dashboard. Please check your internet connection.');
+              setLoading(false);
+            }}
+            style={styles.webview}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.loaderOverlay}>
+                <ActivityIndicator size="large" color={COLORS.primaryGreen} />
+                <Text style={styles.loaderText}>Syncing Premium Dashboard...</Text>
+              </View>
+            )}
+          />
+        )}
       </View>
 
       {error && (

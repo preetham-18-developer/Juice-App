@@ -11,12 +11,25 @@ export default function RootPage() {
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
       try {
+        // CAPTURE TOKENS FROM URL (For seamless mobile handoff)
+        const urlParams = new URLSearchParams(window.location.search);
+        const accessToken = urlParams.get('access_token');
+        const refreshToken = urlParams.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          console.log("[Auth] Handoff tokens detected, setting session...");
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          // Clean URL to prevent token leakage in history
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         
-        const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://juicy-app.vercel.app";
-
         if (!session) {
-          router.push('/login');
+          setAuthLoading(false);
           return;
         }
 
@@ -33,10 +46,11 @@ export default function RootPage() {
         if (isAdmin) {
           router.replace('/admin/dashboard');
         } else {
-          router.push('/login');
+          setAuthLoading(false);
         }
       } catch (err) {
         console.error("Redirect check failed:", err);
+        setAuthLoading(false);
       }
     };
 
@@ -48,13 +62,13 @@ export default function RootPage() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-medium font-outfit">Redirecting you to the right place...</p>
+          <p className="text-slate-500 font-medium font-outfit">Syncing with your session...</p>
         </div>
       </div>
     );
   }
 
-  // Only reached if session is null and we are on Vercel with no CUSTOMER_APP_URL configured
+  // Only reached if session is null or not admin
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 text-center border border-slate-100">
@@ -62,13 +76,13 @@ export default function RootPage() {
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-black">!</div>
         </div>
         <h1 className="text-2xl font-black text-slate-900 mb-2">Login Required</h1>
-        <p className="text-slate-500 font-medium mb-8">Please login via the Customer App to access the Admin Dashboard.</p>
-        <a 
-          href={process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://customer-app-juice-u13x.vercel.app/login"}
+        <p className="text-slate-500 font-medium mb-8">Please login to access the Admin Dashboard.</p>
+        <button 
+          onClick={() => router.push('/login')}
           className="block w-full py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           Go to Login
-        </a>
+        </button>
       </div>
     </div>
   );

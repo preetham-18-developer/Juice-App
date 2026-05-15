@@ -54,13 +54,12 @@ export default function LoginScreen() {
   }, [loginSuccess]);
 
   // NUCLEAR CACHE CLEAR ON MOUNT
-  // This guarantees that if the user reaches the login screen, absolutely NO stale state remains.
+  // This guarantees that if the user reaches the login screen, we clear STALE storage.
+  // We DO NOT call signOut() here because it could trigger a loop during the login transition.
   useEffect(() => {
     const clearNuclear = async () => {
       try {
-        console.log('[Auth] Initiating nuclear cache clear...');
-        await supabase.auth.signOut();
-        
+        console.log('[Auth] Cleaning stale storage...');
         if (Platform.OS !== 'web') {
           const AsyncStorage = require('@react-native-async-storage/async-storage').default;
           await AsyncStorage.clear();
@@ -68,9 +67,9 @@ export default function LoginScreen() {
           window.localStorage.clear();
           window.sessionStorage.clear();
         }
-        console.log('[Auth] Nuclear cache clear successful. Ready for clean login.');
+        console.log('[Auth] Storage clean. Ready for login.');
       } catch (err) {
-        console.error('[Auth] Failed to clear cache', err);
+        console.error('[Auth] Failed to clear storage', err);
       }
     };
     clearNuclear();
