@@ -10,6 +10,7 @@ export default function RootPage() {
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
+      console.log("[Auth] STABILIZED_DASHBOARD_V2.0_LOADED");
       try {
         // CAPTURE TOKENS FROM URL (For seamless mobile handoff)
         const urlParams = new URLSearchParams(window.location.search);
