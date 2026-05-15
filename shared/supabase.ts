@@ -11,8 +11,8 @@ const sanitizeUrl = (url: string) => {
   return url;
 };
 
-const supabaseUrl = 'https://tzpmsylelpqzjmfvabga.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6cG1zeWxlbHBxemptZnZhYmdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzQwMTcsImV4cCI6MjA5MjYxMDAxN30.a8pHx5OubH0ODbWHImt0Ejp2Hj3kAtlI5i14YnkKUXk';
+const supabaseUrl = 'https://juozeonesytttmaizdso.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1b3plb25lc3l0dHRtYWl6ZHNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1OTk4MjgsImV4cCI6MjA5MzE3NTgyOH0.dfWHMFp62ET2rGdKVlcLQgQ8ZV9PyMzivEexkZVY6n8';
 
 /**
  * Robust Fetch wrapper with retries and timeouts to handle mobile network instability.
