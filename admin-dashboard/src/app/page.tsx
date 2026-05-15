@@ -1,28 +1,26 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 export default function RootPage() {
   const router = useRouter();
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
-        // Use a more robust production-ready fallback URL
-        const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
-        const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
-                                (isVercel
-                                  ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
-                                  : "https://juicy-app.vercel.app");
+        const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://juicy-app.vercel.app";
 
         if (!session) {
-          // If we can't find a customer app, just go to a relative login if it exists, 
-          // but for this monorepo we usually expect them to be separate.
-          // We'll add a check to see if we're on the same domain.
+          // If we are on Vercel and the redirect might be broken, just show a message instead of a 404
+          if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') && CUSTOMER_APP_URL === "https://juicy-app.vercel.app") {
+             setAuthLoading(false);
+             return;
+          }
           window.location.href = `${CUSTOMER_APP_URL}/login`;
           return;
         }
@@ -40,7 +38,6 @@ export default function RootPage() {
         if (isAdmin) {
           router.replace('/admin/dashboard');
         } else {
-          // Not an admin? Send them to the customer experience
           window.location.href = CUSTOMER_APP_URL;
         }
       } catch (err) {
@@ -51,11 +48,32 @@ export default function RootPage() {
     checkAuthAndRedirect();
   }, [router]);
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium font-outfit">Redirecting you to the right place...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only reached if session is null and we are on Vercel with no CUSTOMER_APP_URL configured
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-slate-500 font-medium font-outfit">Redirecting you to the right place...</p>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10 text-center border border-slate-100">
+        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-black">!</div>
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 mb-2">Login Required</h1>
+        <p className="text-slate-500 font-medium mb-8">Please login via the Customer App to access the Admin Dashboard.</p>
+        <a 
+          href={process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://juicy-app.vercel.app/login"}
+          className="block w-full py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
+          Go to Login
+        </a>
       </div>
     </div>
   );

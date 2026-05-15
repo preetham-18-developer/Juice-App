@@ -67,11 +67,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         const { data: { session } } = await supabase.auth.getSession();
         
-        const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
-        const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
-                               (isVercel 
-                                 ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
-                                 : "https://juicy-app.vercel.app");
+        const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://juicy-app.vercel.app";
 
         if (!session) {
           window.location.href = `${CUSTOMER_APP_URL}/login`;
