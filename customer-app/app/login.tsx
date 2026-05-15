@@ -46,13 +46,35 @@ export default function LoginScreen() {
   // Trigger balloons on success
   useEffect(() => {
     if (loginSuccess && Platform.OS === 'web') {
-      // Small delay to ensure component is mounted if needed, or trigger immediately
       const timer = setTimeout(() => {
         balloonsRef.current?.launchAnimation();
       }, 100);
       return () => clearTimeout(timer);
     }
   }, [loginSuccess]);
+
+  // NUCLEAR CACHE CLEAR ON MOUNT
+  // This guarantees that if the user reaches the login screen, absolutely NO stale state remains.
+  useEffect(() => {
+    const clearNuclear = async () => {
+      try {
+        console.log('[Auth] Initiating nuclear cache clear...');
+        await supabase.auth.signOut();
+        
+        if (Platform.OS !== 'web') {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          await AsyncStorage.clear();
+        } else {
+          window.localStorage.clear();
+          window.sessionStorage.clear();
+        }
+        console.log('[Auth] Nuclear cache clear successful. Ready for clean login.');
+      } catch (err) {
+        console.error('[Auth] Failed to clear cache', err);
+      }
+    };
+    clearNuclear();
+  }, []);
 
   // Success feedback
   useEffect(() => {

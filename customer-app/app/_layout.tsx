@@ -94,7 +94,7 @@ export default function RootLayout() {
         console.log('[Boot] Auth timeout reached, forcing initialization');
         setInitialized(true);
       }
-    }, 1000);
+    }, 5000); // Increased from 1s to 5s to ensure auth has time to resolve
 
     // Check initial session safely
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -102,13 +102,13 @@ export default function RootLayout() {
       if (session) {
         setSession(session);
         
-        // Safety timeout for role fetch: if it takes > 2s, default to customer
+        // Safety timeout for role fetch: if it takes > 10s, default to customer
         const roleTimeout = setTimeout(() => {
           if (!userRole) {
-            console.log('[Boot] Role fetch timed out, defaulting to customer');
+            console.log('[Boot] Role fetch timed out after 10s, defaulting to customer');
             setUserRole('customer');
           }
-        }, 2000);
+        }, 10000); // Increased from 2s to 10s to prevent customer screen flash on slow networks
 
         // FETCH ROLE BEFORE INITIALIZING
         try {
