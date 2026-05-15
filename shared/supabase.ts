@@ -2,11 +2,11 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 
 const sanitizeUrl = (url: string) => {
-  if (!url || url.includes('placeholder')) return url;
-  // Fix for the recursive URL bug seen in production
-  if ((url.match(/http/g) || []).length > 1) {
-    const parts = url.split('http');
-    return 'http' + parts[1].replace(/:$/, ''); // Take the first valid part
+  if (!url || typeof url !== 'string' || url.includes('placeholder')) return url;
+  // Stronger fix for recursive URL bugs (e.g., URL pasted multiple times)
+  const match = url.match(/https?:\/\/[^h\s]+/);
+  if (match) {
+    return match[0].replace(/\/$/, ''); // Remove trailing slash
   }
   return url;
 };

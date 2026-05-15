@@ -2,10 +2,10 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // Version: 2026.05.14.01 - Final Lint Fix
  
 const sanitizeUrl = (url: string) => {
-  if (!url || url.includes('placeholder')) return url;
-  if ((url.match(/http/g) || []).length > 1) {
-    const parts = url.split('http');
-    return 'http' + parts[1].replace(/:$/, '');
+  if (!url || typeof url !== 'string' || url.includes('placeholder')) return url;
+  const match = url.match(/https?:\/\/[^h\s]+/);
+  if (match) {
+    return match[0].replace(/\/$/, '');
   }
   return url;
 };
