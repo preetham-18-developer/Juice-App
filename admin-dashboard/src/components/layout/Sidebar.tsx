@@ -67,8 +67,8 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, isOpenMobile, setIsOpenMobile }:
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "http://localhost:8081";
-    window.location.href = `${CUSTOMER_APP_URL}/login`;
+    // Use internal login page instead of trying to jump to potentially local addresses
+    router.push('/login');
   };
 
   const dynamicMenuItems = menuItems;
