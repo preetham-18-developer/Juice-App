@@ -13,13 +13,16 @@ export default function RootPage() {
         const { data: { session } } = await supabase.auth.getSession();
         
         // Use a more robust production-ready fallback URL
+        const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
         const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || 
-                                (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+                                (isVercel
                                   ? `https://${window.location.hostname.replace('admin-dashboard', 'customer-app')}`
-                                  : "https://juicy-app.vercel.app"); // Better default fallback
+                                  : "https://juicy-app.vercel.app");
 
         if (!session) {
-          // Instead of hard-redirecting to localhost, we'll try to find a web login
+          // If we can't find a customer app, just go to a relative login if it exists, 
+          // but for this monorepo we usually expect them to be separate.
+          // We'll add a check to see if we're on the same domain.
           window.location.href = `${CUSTOMER_APP_URL}/login`;
           return;
         }
