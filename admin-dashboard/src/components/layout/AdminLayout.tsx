@@ -70,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://juicy-app.vercel.app";
 
         if (!session) {
-          window.location.href = `${CUSTOMER_APP_URL}/login`;
+          router.push('/login');
           return;
         }
 

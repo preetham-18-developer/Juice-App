@@ -16,12 +16,7 @@ export default function RootPage() {
         const CUSTOMER_APP_URL = process.env.NEXT_PUBLIC_CUSTOMER_APP_URL || "https://juicy-app.vercel.app";
 
         if (!session) {
-          // If we are on Vercel and the redirect might be broken, just show a message instead of a 404
-          if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') && CUSTOMER_APP_URL === "https://juicy-app.vercel.app") {
-             setAuthLoading(false);
-             return;
-          }
-          window.location.href = `${CUSTOMER_APP_URL}/login`;
+          router.push('/login');
           return;
         }
 
@@ -38,7 +33,7 @@ export default function RootPage() {
         if (isAdmin) {
           router.replace('/admin/dashboard');
         } else {
-          window.location.href = CUSTOMER_APP_URL;
+          router.push('/login');
         }
       } catch (err) {
         console.error("Redirect check failed:", err);
