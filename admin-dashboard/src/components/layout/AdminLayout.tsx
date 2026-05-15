@@ -90,7 +90,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           if (typeof window !== 'undefined') {
             localStorage.clear();
           }
-          window.location.href = `${CUSTOMER_APP_URL}/login?error=unauthorized`;
+          // Redirect to the internal dashboard login with an error message
+          router.push('/login?error=unauthorized');
           return;
         }
 
